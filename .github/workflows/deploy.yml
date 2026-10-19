@@ -1,0 +1,100 @@
+name: Deploy
+
+# Deploys the non-Bedrock layer only. Bedrock resources are built by hand in the
+# console (documentation/labs/), and the deploy role has no Bedrock permissions.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # GitHub OIDC -> AWS
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: ci
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            infra/package-lock.json
+            frontend/package-lock.json
+
+      - name: CDK deploy
+        working-directory: infra
+        run: |
+          npm ci
+          npx cdk deploy --all --require-approval never
+
+      - name: Read stack outputs
+        id: outputs
+        run: |
+          out() { aws cloudformation describe-stacks --stack-name "$1" \
+            --query "Stacks[0].Outputs[?OutputKey=='$2'].OutputValue" --output text; }
+          {
+            echo "api_url=$(out CoachApiGateway ApiUrl)"
+            echo "user_pool_id=$(out CoachApiGateway UserPoolId)"
+            echo "user_pool_client_id=$(out CoachApiGateway UserPoolClientId)"
+            echo "amplify_app_id=$(out CoachFrontend AmplifyAppId)"
+            echo "kb_bucket=$(out CoachData KbSourceBucketName)"
+            echo "eval_bucket=$(out CoachData EvalBucketName)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          VITE_API_BASE_URL: ${{ steps.outputs.outputs.api_url }}
+          VITE_USER_POOL_ID: ${{ steps.outputs.outputs.user_pool_id }}
+          VITE_USER_POOL_CLIENT_ID: ${{ steps.outputs.outputs.user_pool_client_id }}
+        run: |
+          npm ci
+          npm run build
+          (cd dist && zip -qr ../dist.zip .)
+
+      - name: Deploy frontend to Amplify
+        env:
+          APP_ID: ${{ steps.outputs.outputs.amplify_app_id }}
+        run: |
+          read -r JOB_ID UPLOAD_URL < <(aws amplify create-deployment --app-id "$APP_ID" --branch-name main \
+            --query '[jobId, zipUploadUrl]' --output text)
+          curl -sS --fail -X PUT -H 'Content-Type: application/zip' --upload-file frontend/dist.zip "$UPLOAD_URL"
+          aws amplify start-deployment --app-id "$APP_ID" --branch-name main --job-id "$JOB_ID"
+          for _ in $(seq 1 30); do
+            STATUS=$(aws amplify get-job --app-id "$APP_ID" --branch-name main --job-id "$JOB_ID" \
+              --query 'job.summary.status' --output text)
+            echo "Amplify job $JOB_ID: $STATUS"
+            [[ "$STATUS" == "SUCCEED" ]] && exit 0
+            [[ "$STATUS" == "FAILED" || "$STATUS" == "CANCELLED" ]] && exit 1
+            sleep 10
+          done
+          exit 1
+
+      - name: Sync action-group schemas and eval datasets to S3
+        run: |
+          aws s3 sync bedrock/action-groups "s3://${{ steps.outputs.outputs.kb_bucket }}/schemas/" --delete
+          if [ -d bedrock/eval ] && ls bedrock/eval/*.jsonl >/dev/null 2>&1; then
+            aws s3 sync bedrock/eval "s3://${{ steps.outputs.outputs.eval_bucket }}/datasets/" --exclude '*' --include '*.jsonl'
+          fi

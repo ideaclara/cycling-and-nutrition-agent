@@ -1,0 +1,24 @@
+{
+  "$schema": "./models.schema.json",
+  "region": "us-east-1",
+  "roles": {
+    "agent": {
+      "modelId": "REPLACE_ME: Claude Haiku 5.5 inference profile ID (us.*) from the us-east-1 model catalog",
+      "fallback": "REPLACE_ME: Claude Haiku 4.5 inference profile ID (us.*)"
+    },
+    "flow": {
+      "modelId": "REPLACE_ME: Claude Haiku 5.5 inference profile ID (us.*)"
+    },
+    "compare": [
+      { "modelId": "REPLACE_ME: Amazon Nova Lite ID" },
+      { "modelId": "REPLACE_ME: Amazon Nova Pro ID" }
+    ],
+    "judge": {
+      "modelId": "REPLACE_ME: Claude Sonnet 5.5 inference profile ID (us.*)"
+    },
+    "embeddings": {
+      "modelId": "amazon.titan-embed-text-v2:0",
+      "dimensions": 1024
+    }
+  }
+}

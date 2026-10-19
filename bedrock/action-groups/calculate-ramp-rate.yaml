@@ -1,0 +1,52 @@
+openapi: 3.0.0
+info:
+  title: Training load ramp rate
+  version: 1.0.0
+  description: Compute how quickly chronic training load (CTL, "fitness") is rising or falling.
+paths:
+  /ramp-rate:
+    get:
+      operationId: calculate_ramp_rate
+      summary: Calculate the CTL ramp rate per week over a recent window
+      description: >-
+        Use when the athlete asks whether they are building fitness too fast or too
+        slowly, or before recommending a load increase. Returns ramp_per_week (CTL
+        points per week), an assessment (detraining, maintaining, sustainable, high,
+        aggressive) and the CTL/ATL/TSB trend.
+      parameters:
+        - name: days
+          in: query
+          required: false
+          description: Window length in days (1-90). Defaults to 7.
+          schema:
+            type: integer
+        - name: end_date
+          in: query
+          required: false
+          description: Last day of the window, YYYY-MM-DD. Defaults to today.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Ramp rate and trend
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ramp_per_week:
+                    type: number
+                  assessment:
+                    type: string
+                  ctl_start:
+                    type: number
+                  ctl_end:
+                    type: number
+                  latest_tsb:
+                    type: number
+                  trend:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Not enough CTL data logged in the window

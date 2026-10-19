@@ -1,0 +1,32 @@
+[project]
+name = "cycling-coach-services"
+version = "0.1.0"
+description = "Lambda functions for the cycling & nutrition coach (Python, stdlib + boto3 only at runtime)"
+requires-python = ">=3.13"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "boto3>=1.40",
+    "botocore[crt]>=1.40",
+    "moto[dynamodb,s3,secretsmanager,sqs]>=5.1",
+    "pytest>=8.4",
+    "ruff>=0.14",
+    "jsonschema>=4.25",
+    "openapi-spec-validator>=0.7",
+    "pyyaml>=6.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]

@@ -1,0 +1,66 @@
+openapi: 3.0.0
+info:
+  title: Diet Quality Score logging
+  version: 1.0.0
+  description: >-
+    Record foods eaten and score them with Matt Fitzgerald's Diet Quality Score (DQS).
+    The scoring is done by this API, never by the model.
+paths:
+  /dqs-entries:
+    post:
+      operationId: log_dqs_entry
+      summary: Log food servings for a day and return the updated Diet Quality Score
+      description: >-
+        Convert what the athlete says they ate into one item per food, each with a DQS
+        category and a number of servings (half servings allowed), then call this once.
+        Categories - high quality: fruit, vegetables, lean_meats_fish, nuts_seeds,
+        whole_grains, dairy. Low quality: refined_grains, sweets, fried_foods,
+        fatty_proteins. If a food's category is unclear, ask the athlete before logging.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - food_items
+              properties:
+                date:
+                  type: string
+                  description: Calendar day in YYYY-MM-DD format. Defaults to today.
+                food_items:
+                  type: array
+                  description: Foods to log.
+                  items:
+                    type: object
+                    required:
+                      - category
+                      - servings
+                    properties:
+                      description:
+                        type: string
+                        description: What the athlete ate, in their words.
+                      category:
+                        type: string
+                        enum: [fruit, vegetables, lean_meats_fish, nuts_seeds, whole_grains, dairy, refined_grains, sweets, fried_foods, fatty_proteins]
+                      servings:
+                        type: number
+                        description: Number of servings, e.g. 1 or 0.5.
+      responses:
+        '200':
+          description: Updated score for the day
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  dqs_total:
+                    type: number
+                  dqs_change:
+                    type: number
+                  dqs_breakdown:
+                    type: object
+                  servings_today:
+                    type: object
+        '400':
+          description: Invalid category or servings

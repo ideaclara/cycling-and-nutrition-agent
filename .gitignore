@@ -20,3 +20,25 @@ Thumbs.db
 # Runtime / temporary files
 *.tmp
 *.bak
+
+# ==========================================
+# Build & dependency output
+# ==========================================
+node_modules/
+cdk.out/
+dist/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+coverage/
+
+# Local environment / secrets
+.env
+.env.*
+!.env.example
+
+# Copyrighted knowledge-base source documents (kept local + in private S3 only)
+bedrock/kb-docs/**/*.pdf
+bedrock/kb-docs/**/*.epub

@@ -1,0 +1,50 @@
+openapi: 3.0.0
+info:
+  title: Daily metrics
+  version: 1.0.0
+  description: >-
+    Read the athlete's consolidated data for one calendar day: the manual daily log
+    (Garmin recovery, Xert fitness signature, TrainingPeaks load, Diet Quality Score,
+    waist measurement), the latest Withings scale reading, and that day's Strava rides.
+paths:
+  /daily-metrics:
+    get:
+      operationId: get_daily_metrics
+      summary: Get all training, recovery, body and nutrition data for one day
+      description: >-
+        Use this before giving any training or nutrition recommendation, to ground
+        advice in the athlete's actual HRV, sleep, readiness, form (TSB) and recent
+        rides. If daily_log_missing is true, tell the athlete the day has not been
+        logged instead of guessing values.
+      parameters:
+        - name: date
+          in: query
+          required: false
+          description: Calendar day in YYYY-MM-DD format. Defaults to today (Europe/London).
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Consolidated metrics for the day
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  date:
+                    type: string
+                  daily_log:
+                    type: object
+                    description: >-
+                      Manual log fields, e.g. hrv_overnight_avg_ms, resting_hr_bpm, sleep_score,
+                      training_readiness, xert_tp_w, tp_ctl, tp_atl, tp_tsb, dqs_total, waist_cm.
+                  daily_log_missing:
+                    type: boolean
+                  withings_latest:
+                    type: object
+                    description: Most recent scale session on or before the day (weight_kg, fat_ratio_pct, ...).
+                  strava_activities:
+                    type: array
+                    description: Rides started that day (moving_time s, distance m, weighted_average_watts W, kilojoules, suffer_score).
+                    items:
+                      type: object
