@@ -1,0 +1,177 @@
+openapi: 3.0.3
+info:
+  title: Withings Health Telemetry API
+  version: 1.0.0
+  description: Read-optimized HTTP API for retrieving parsed Withings body composition and cardiovascular telemetry from Amazon DynamoDB.
+servers:
+  - url: https://{apiId}.execute-api.eu-west-2.amazonaws.com
+    description: Amazon API Gateway HTTP API (v2) in London (eu-west-2)
+paths:
+  /telemetry/measures:
+    get:
+      summary: Retrieve Telemetry Measurements
+      description: Fetches a descending, time-ordered list of measurement sessions for a given user profile, utilizing cursor-based pagination.
+      parameters:
+        - name: userId
+          in: query
+          required: false
+          schema:
+            type: string
+            default: "31179536"
+          description: The Withings user identifier (stored under PK USER#<userId>).
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 50
+          description: Maximum number of measurement records to return per page.
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Pagination token representing the sort key epoch timestamp of the last evaluated item from the previous response.
+      responses:
+        '200':
+          description: Successfully retrieved telemetry records.
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: string
+              example: "*"
+            Access-Control-Allow-Methods:
+              schema:
+                type: string
+              example: "GET,OPTIONS"
+            Access-Control-Allow-Headers:
+              schema:
+                type: string
+              example: "Content-Type,Authorization"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MeasurementSession'
+                  count:
+                    type: integer
+                    example: 50
+                  next_cursor:
+                    type: string
+                    nullable: true
+                    example: "1727764796"
+        '500':
+          description: Internal server error or DynamoDB query failure.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Error querying telemetry: ProvisionedThroughputExceededException"
+    options:
+      summary: CORS Support
+      description: Preflight request handler for API Gateway HTTP API CORS configuration.
+      responses:
+        '200':
+          description: Default CORS preflight response.
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: string
+              example: "*"
+            Access-Control-Allow-Methods:
+              schema:
+                type: string
+              example: "GET,OPTIONS"
+            Access-Control-Allow-Headers:
+              schema:
+                type: string
+              example: "Content-Type,Authorization"
+components:
+  schemas:
+    MeasurementSession:
+      type: object
+      properties:
+        PK:
+          type: string
+          example: "USER#31179536"
+        SK:
+          type: string
+          example: "WITHINGS#MEAS#1727764796"
+        timestamp:
+          type: integer
+          format: int64
+          example: 1727764796
+          description: UTC Unix epoch timestamp of the measurement session.
+        weight_kg:
+          type: number
+          format: float
+          example: 80.05
+          description: Total body mass in kilograms.
+        fat_ratio_pct:
+          type: number
+          format: float
+          example: 20.9
+          description: Body fat percentage.
+        fat_mass_weight_kg:
+          type: number
+          format: float
+          example: 16.73
+          description: Fat mass weight in kilograms.
+        fat_free_mass_kg:
+          type: number
+          format: float
+          example: 63.32
+          description: Fat-free body mass in kilograms.
+        muscle_mass_kg:
+          type: number
+          format: float
+          example: 60.15
+          description: Skeletal muscle mass in kilograms.
+        hydration_kg:
+          type: number
+          format: float
+          example: 42.77
+          description: Total body water hydration weight in kilograms.
+        bone_mass_kg:
+          type: number
+          format: float
+          example: 3.16
+          description: Bone mineral mass in kilograms.
+        heart_pulse_bpm:
+          type: integer
+          example: 58
+          description: Resting heart rate in beats per minute.
+        pulse_wave_velocity_raw_ms:
+          type: number
+          format: float
+          example: 6.76
+          description: Raw aortic-femoral arterial transit wave speed in meters per second.
+        pulse_wave_velocity_normalized_ms:
+          type: number
+          format: float
+          example: 6.72
+          description: Heart-rate and blood-pressure normalized PWV in meters per second.
+        vascular_age_yrs:
+          type: number
+          format: float
+          example: 57.0
+          description: Biological arterial age estimation.
+        device_model:
+          type: string
+          example: "Body Cardio"
+          description: Hardware device model identifier.
+        measure_group_ids:
+          type: array
+          items:
+            type: integer
+          example: [3289104820]
+          description: List of raw Withings measurement group identifiers consolidated into this session.

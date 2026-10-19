@@ -1,0 +1,22 @@
+# ==========================================
+# Custom Exclusions
+# ==========================================
+
+# Exclude all files and subfolders inside the useful-source-files folder
+useful-source-files/
+
+# ==========================================
+# Standard System and Log Files
+# ==========================================
+
+# Log files
+*.log
+
+# OS generated files
+.DS_Store
+.DS_Store?
+Thumbs.db
+
+# Runtime / temporary files
+*.tmp
+*.bak
