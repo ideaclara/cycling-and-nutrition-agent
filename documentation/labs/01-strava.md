@@ -67,7 +67,7 @@ The script saves `documentation/initial-setup-documentation/strava-example-respo
 
 Sign in to the Amplify app (`AppUrl` output of `CoachFrontend`) and click **Sync Strava** in the header. It calls `POST /strava/sync` with your Cognito token and reports how many activities were queued. The first run should queue everything since 1 January (`after=1767225600`).
 
-Watch progress in CloudWatch Logs (`/aws/lambda/strava-fetch-activity-worker`) or in the SQS console. Strava allows about 100 reads per 15 minutes. When the worker hits a 429, it hides the message for 15 minutes and the backfill carries on by itself.
+Watch progress in CloudWatch Logs (`/aws/lambda/strava-fetch-activity-worker`) or in the SQS console. Your app's read limit is 200 calls per 15 minutes and 2,000 per day, according to the `x-readratelimit-limit` header from the probe, so a backfill of a few hundred rides takes one or two windows. When the worker hits a 429, it hides the message for 15 minutes and the backfill carries on by itself.
 
 ## Verify
 

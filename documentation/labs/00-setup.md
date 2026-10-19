@@ -42,13 +42,13 @@ cd services && uv run python ../scripts/validate_config.py   # warns about any R
 
 > **Self-check:** (1) Why might an on-demand call to a bare model ID fail with "on-demand throughput isn't supported" while a profile for the same model works? (2) A company must keep EU customer data in the EU. Which profile type should it use, and what would a `global.` profile risk?
 
-## 2. Activate the cost allocation tag
+## 2. Activate the cost allocation tag (a day after step 4)
 
 Every resource CDK creates is tagged `project=cycling-coach`. The project budget filters on that tag, but AWS only sees the tag after you activate it:
 
 **Billing and Cost Management → Cost allocation tags → User-defined → `project` → Activate.**
 
-The tag can take up to 24 hours to appear after the first deploy. Tag the Bedrock resources you build by hand with `project=cycling-coach` too, so they count towards this budget. Your account-wide `$100 Monthly Cost Budget` and the `Default-Services-Monitor` anomaly monitor stay in place as the overall backstop.
+**You can't do this yet.** A user-defined tag key only appears in that list once at least one resource carries it, and it can take up to 24 hours to show up after that. Do step 4 first, then come back the next day. Costs are only tracked by the tag from the moment you activate it, so the project budget shows $0 until then. Tag the Bedrock resources you build by hand with `project=cycling-coach` too, so they count towards this budget. Your account-wide `$100 Monthly Cost Budget` and the `Default-Services-Monitor` anomaly monitor stay in place as the overall backstop.
 
 ## 3. Fill in the CDK context
 
