@@ -54,7 +54,7 @@ Every resource CDK creates is tagged `project=cycling-coach`. The project budget
 
 In `infra/cdk.json`, set:
 - `budgetEmail`: where budget alerts are sent.
-- `githubRepo`: `owner/repo`, for the OIDC deploy role.
+- `githubSubjectPrefix`: the start of the OIDC subject GitHub sends for this repo. Find it with `gh api repos/<owner>/<repo>/actions/oidc/customization/sub`. If `use_immutable_subject` is true, use the `sub_claim_prefix` value (`repo:<owner>@<id>/<repo>@<id>`); otherwise use `repo:<owner>/<repo>`.
 
 `athleteId` (Strava) and `withingsUserId` are already filled in from the old systems.
 
@@ -82,7 +82,7 @@ Cognito emails a temporary password. You'll set a new one at first sign-in.
 
 ## 5. Wire up GitHub Actions
 
-1. Push this repo to GitHub (`githubRepo` above).
+1. Push this repo to GitHub.
 2. Set the repository variable `AWS_DEPLOY_ROLE_ARN` to the `DeployRoleArn` output of `CoachCicd`.
 3. Create a `production` environment (**Settings → Environments**). Under **Deployment branches and tags**, choose **Selected branches** and add `main`. The deploy role trusts jobs in this environment, not a branch: a job with `environment:` gets the OIDC subject `repo:<owner>/<repo>:environment:production`. This branch rule is what stops other branches from deploying. You can also add yourself as a required reviewer.
 

@@ -1,18 +1,29 @@
 {
   "app": "npx tsx bin/app.ts",
   "watch": {
-    "include": ["bin/**", "lib/**", "../services/**"],
-    "exclude": ["**/*.d.ts", "node_modules", "cdk.out", "../services/tests/**"]
+    "include": [
+      "bin/**",
+      "lib/**",
+      "../services/**"
+    ],
+    "exclude": [
+      "**/*.d.ts",
+      "node_modules",
+      "cdk.out",
+      "../services/tests/**"
+    ]
   },
   "context": {
     "athleteId": "3634905",
     "withingsUserId": "31179536",
     "budgetEmail": "matt@ideaclara.com",
-    "githubRepo": "ideaclara/cycling-and-nutrition-agent",
+    "githubSubjectPrefix": "repo:ideaclara@47756684/cycling-and-nutrition-agent@1425874626",
     "@aws-cdk/core:defaultCrossStackReferences": "strong",
     "@aws-cdk/aws-lambda:recognizeLayerVersion": true,
     "@aws-cdk/core:checkSecretUsage": true,
-    "@aws-cdk/core:target-partitions": ["aws"],
+    "@aws-cdk/core:target-partitions": [
+      "aws"
+    ],
     "@aws-cdk/aws-iam:minimizePolicies": true,
     "@aws-cdk/core:enablePartitionLiterals": true,
     "@aws-cdk/aws-s3:createDefaultLoggingPolicy": true,

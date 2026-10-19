@@ -70,7 +70,7 @@ const frontend = new FrontendStack(app, 'CoachFrontend', {
 
 new CicdStack(app, 'CoachCicd', {
   env,
-  githubRepo: ctx('githubRepo'),
+  githubSubjectPrefix: ctx('githubSubjectPrefix'),
   amplifyAppId: frontend.appId,
   kbSourceBucketArn: data.kbSourceBucket.bucketArn,
   evalBucketArn: data.evalBucket.bucketArn,

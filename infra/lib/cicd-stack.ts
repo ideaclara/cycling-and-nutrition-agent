@@ -3,8 +3,13 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 
 export interface CicdStackProps extends StackProps {
-  /** "owner/repo" on GitHub. */
-  readonly githubRepo: string;
+  /**
+   * Start of the OIDC `sub` claim GitHub sends for this repo, up to the colon.
+   * Repos with immutable subjects use "repo:<owner>@<ownerId>/<repo>@<repoId>";
+   * otherwise "repo:<owner>/<repo>". Check with
+   * `gh api repos/<owner>/<repo>/actions/oidc/customization/sub`.
+   */
+  readonly githubSubjectPrefix: string;
   readonly amplifyAppId: string;
   readonly kbSourceBucketArn: string;
   readonly evalBucketArn: string;
@@ -13,8 +18,8 @@ export interface CicdStackProps extends StackProps {
 /**
  * GitHub Actions -> AWS via OIDC (no long-lived keys). The deploy role can only
  * be assumed by jobs running in this repository's `production` environment.
- * (A job that declares `environment:` gets an OIDC subject of
- * `repo:<owner>/<repo>:environment:<name>`, not the branch ref.) Restrict that
+ * (A job that declares `environment:` gets an OIDC subject ending in
+ * `:environment:<name>`, not the branch ref.) Restrict that
  * environment to the `main` branch in GitHub's environment settings.
  *
  * It can deploy CDK (by assuming the CDK bootstrap roles), deploy the Amplify
@@ -41,7 +46,7 @@ export class CicdStack extends Stack {
       assumedBy: new iam.WebIdentityPrincipal(provider.openIdConnectProviderArn, {
         StringEquals: {
           'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com',
-          'token.actions.githubusercontent.com:sub': `repo:${props.githubRepo}:environment:production`,
+          'token.actions.githubusercontent.com:sub': `${props.githubSubjectPrefix}:environment:production`,
         },
       }),
     });
