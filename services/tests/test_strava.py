@@ -9,15 +9,8 @@ import pytest
 from common import strava_api
 from tests.conftest import http_event
 
-SAMPLE = os.path.join(
-    os.path.dirname(__file__),
-    "..",
-    "..",
-    "documentation",
-    "initial-setup-documentation",
-    "strava-example-responses",
-    "activities_19084710818.json",
-)
+# A real activity response with location data (GPS, map, places) removed.
+SAMPLE = os.path.join(os.path.dirname(__file__), "fixtures", "activity_redacted.json")
 
 
 def sample_bytes() -> bytes:

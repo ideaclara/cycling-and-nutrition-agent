@@ -45,3 +45,7 @@ bedrock/kb-docs/**/*.epub
 
 # Local reference output (e.g. `aws bedrock list-inference-profiles`)
 documentation/inference-profiles-us-east-1.txt
+
+# Raw Strava API responses contain personal GPS/location data and the repo is
+# public. Keep them local; tests use services/tests/fixtures/activity_redacted.json.
+documentation/initial-setup-documentation/strava-example-responses/*.json

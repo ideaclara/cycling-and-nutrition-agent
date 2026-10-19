@@ -56,7 +56,7 @@ The authorize step stores a one-time `state` value in the secret, and the callba
 scripts/strava_probe.sh 19378104521
 ```
 
-The script saves `documentation/initial-setup-documentation/strava-example-responses/activities_19378104521_all_efforts.json` and prints:
+The script saves `documentation/initial-setup-documentation/strava-example-responses/activities_19378104521_all_efforts.json` and prints the summary below. That folder's JSON files are git-ignored, because raw responses include your GPS routes. The summary shows:
 - the payload size, raw and gzipped
 - the top-level keys
 - the number of segment efforts
