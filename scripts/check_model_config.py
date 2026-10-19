@@ -40,9 +40,13 @@ def main() -> int:
 
     config = json.loads((ROOT / "config" / "models.json").read_text())
     roles = config["roles"]
-    allowed_runtime = {roles["agent"]["modelId"], roles["agent"].get("fallback"), roles["flow"]["modelId"]}
-    allowed_runtime |= {m["modelId"] for m in roles["compare"]}
-    allowed_runtime = {model_name(m) for m in allowed_runtime if m}
+
+    def ids(role: str) -> set[str]:
+        entries = roles[role] if isinstance(roles[role], list) else [roles[role]]
+        return {model_name(m) for e in entries for m in (e.get("modelId"), e.get("fallback")) if m}
+
+    agent_models = ids("agent")
+    allowed_runtime = agent_models | ids("flow") | ids("compare")
 
     client = boto3.client("bedrock-agent", region_name=config["region"])
     findings: list[str] = []
@@ -52,10 +56,9 @@ def main() -> int:
         agent = client.get_agent(agentId=summary["agentId"])["agent"]
         used = model_name(agent.get("foundationModel"))
         checked += 1
-        expected = model_name(roles["agent"]["modelId"])
-        status = "ok " if used == expected else "DRIFT"
+        status = "ok " if used in agent_models else "DRIFT"
         if status != "ok ":
-            findings.append(f"agent {agent['agentName']}: uses {used}, config says {expected}")
+            findings.append(f"agent {agent['agentName']}: uses {used}, config allows {sorted(agent_models)}")
         print(f"{status} agent  {agent['agentName']:<30} {used}")
 
     for summary in list_all(client.list_flows, "flowSummaries"):

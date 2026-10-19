@@ -6,20 +6,25 @@
 
 Open **Amazon Bedrock → Model catalog** in **us-east-1**.
 
-**Concept: model IDs vs inference profiles.** A model ID such as `anthropic.claude-haiku-…` names one model in one Region. Newer models are often only callable on-demand through a **cross-Region inference profile**. Its ID has a geography prefix, for example `us.anthropic.claude-haiku-…`. With a `us.` profile, Bedrock may serve your request from any US Region (us-east-1, us-east-2, us-west-2 …) to smooth out capacity. That has two consequences:
-- Data stays inside the geography (the US), but not inside a single Region.
-- IAM policies for a role that calls the model must allow the *profile* ARN **and** the underlying foundation-model ARNs in each Region the profile can route to.
+**Concept: model IDs vs inference profiles.** A model ID such as `anthropic.claude-haiku-…` names one model in one Region. Newer models are often only callable on-demand through a **cross-Region inference profile**, which comes in two kinds:
 
-You'll meet this again in Module C, when the agent's service role is created.
+| Profile | Example | Where requests may run |
+|---|---|---|
+| Geographic | `us.anthropic.claude-haiku-5-5` | Any Region in that geography (US) |
+| Global | `global.anthropic.claude-haiku-5-5` | Any commercial AWS Region worldwide |
+
+Either way you *call* the profile from your source Region (us-east-1), and Bedrock picks where to run it. Global gives the most capacity headroom and is typically priced a little below geographic, so check the pricing page. Choose geographic only if data residency matters. This project has no residency requirement, so it **defaults to global, with the `us.` profile of the same model as the fallback**. Use the fallback for any console feature that doesn't list global profiles.
+
+What this means for IAM: a role that calls a profile must be allowed to use the *profile* ARN **and** the underlying foundation model in every Region the profile can route to. For a global profile, that means a Region wildcard on the foundation-model ARN. You'll meet this again in Module C, when the agent's service role is created.
 
 For each role in `config/models.json`, find the model and copy the exact ID or inference profile ID:
 
 | Role | Model | Where it's used |
 |---|---|---|
-| `agent` | Claude Haiku 5.5. Use Claude Haiku 4.5 as the `fallback` | Coach agent (Module C) |
-| `flow` | Claude Haiku 5.5 | Prompt node in the Flow (Module D) |
+| `agent` | Claude Haiku 5.5 (`global.`). The `fallback` is the `us.` profile | Coach agent (Module C) |
+| `flow` | Claude Haiku 5.5 (`global.`) | Prompt node in the Flow (Module D) |
 | `compare` | Amazon Nova Lite and Amazon Nova Pro | Prompt comparisons (Module E) |
-| `judge` | Claude Sonnet 5.5 | LLM-as-a-judge evaluation (Module F) |
+| `judge` | Claude Sonnet 5.5 (`global.`) | LLM-as-a-judge evaluation (Module F) |
 | `embeddings` | Titan Text Embeddings v2, 1024 dimensions | Knowledge Base (Module A) |
 
 To list the profiles from the CLI:
@@ -35,7 +40,7 @@ Then check:
 cd services && uv run python ../scripts/validate_config.py   # warns about any REPLACE_ME left
 ```
 
-> **Self-check:** Why might an on-demand call to a model ID fail with "on-demand throughput isn't supported" while the `us.` profile for the same model works?
+> **Self-check:** (1) Why might an on-demand call to a bare model ID fail with "on-demand throughput isn't supported" while a profile for the same model works? (2) A company must keep EU customer data in the EU. Which profile type should it use, and what would a `global.` profile risk?
 
 ## 2. Activate the cost allocation tag
 
