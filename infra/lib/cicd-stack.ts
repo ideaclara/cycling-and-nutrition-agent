@@ -12,7 +12,10 @@ export interface CicdStackProps extends StackProps {
 
 /**
  * GitHub Actions -> AWS via OIDC (no long-lived keys). The deploy role can only
- * be assumed from the `main` branch of this repository.
+ * be assumed by jobs running in this repository's `production` environment.
+ * (A job that declares `environment:` gets an OIDC subject of
+ * `repo:<owner>/<repo>:environment:<name>`, not the branch ref.) Restrict that
+ * environment to the `main` branch in GitHub's environment settings.
  *
  * It can deploy CDK (by assuming the CDK bootstrap roles), deploy the Amplify
  * frontend and sync schemas/eval data to S3. It has NO Bedrock permissions:
@@ -36,8 +39,10 @@ export class CicdStack extends Stack {
       roleName: 'cycling-coach-github-deploy',
       maxSessionDuration: Duration.hours(1),
       assumedBy: new iam.WebIdentityPrincipal(provider.openIdConnectProviderArn, {
-        StringEquals: { 'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com' },
-        StringLike: { 'token.actions.githubusercontent.com:sub': `repo:${props.githubRepo}:ref:refs/heads/main` },
+        StringEquals: {
+          'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com',
+          'token.actions.githubusercontent.com:sub': `repo:${props.githubRepo}:environment:production`,
+        },
       }),
     });
 

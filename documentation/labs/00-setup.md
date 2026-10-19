@@ -84,7 +84,7 @@ Cognito emails a temporary password. You'll set a new one at first sign-in.
 
 1. Push this repo to GitHub (`githubRepo` above).
 2. Set the repository variable `AWS_DEPLOY_ROLE_ARN` to the `DeployRoleArn` output of `CoachCicd`.
-3. Create a `production` environment. You can optionally require a reviewer on it.
+3. Create a `production` environment (**Settings → Environments**). Under **Deployment branches and tags**, choose **Selected branches** and add `main`. The deploy role trusts jobs in this environment, not a branch: a job with `environment:` gets the OIDC subject `repo:<owner>/<repo>:environment:production`. This branch rule is what stops other branches from deploying. You can also add yourself as a required reviewer.
 
 From then on, every push to `main` runs CI and then deploys. Every pull request runs CI only.
 
