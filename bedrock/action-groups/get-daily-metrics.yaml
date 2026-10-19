@@ -45,6 +45,10 @@ paths:
                     description: Most recent scale session on or before the day (weight_kg, fat_ratio_pct, ...).
                   strava_activities:
                     type: array
-                    description: Rides started that day (moving_time s, distance m, weighted_average_watts W, kilojoules, suffer_score).
+                    description: >-
+                      Rides started that day (moving_time s, distance m, weighted_average_watts W,
+                      kilojoules, suffer_score). hr_zone_seconds and power_zone_seconds give the
+                      seconds spent in each zone; the matching *_zone_bounds list each zone's
+                      [min, max] in bpm or watts, where max -1 means no upper limit.
                     items:
                       type: object

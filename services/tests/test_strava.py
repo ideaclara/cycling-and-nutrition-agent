@@ -136,42 +136,112 @@ def test_list_via_http_returns_202(aws):
 
 # --- fetch worker ------------------------------------------------------------
 
+ZONES = os.path.join(os.path.dirname(__file__), "fixtures", "activity_zones.json")
 
-def sqs_record(activity_id="19084710818", sk="2026-09-28T07:00:00Z#19084710818"):
+
+def _sample_sk() -> str:
+    from strava.activity_item import sort_key
+
+    with open(SAMPLE, "rb") as f:
+        activity = json.load(f)
+    return sort_key(activity["start_date"], activity["id_str"])
+
+
+SK = _sample_sk()
+
+
+def zones_bytes() -> bytes:
+    with open(ZONES, "rb") as f:
+        return f.read()
+
+
+def sqs_record(activity_id="19084710818", sk=SK):
     body = json.dumps({"athleteId": "3634905", "activityId": activity_id, "sk": sk})
     return {"Records": [{"body": body, "receiptHandle": "rh"}]}
 
 
-def test_worker_stores_full_payload_compressed(aws):
-    from strava.activity_item import decode_raw, sort_key
+def fake_strava(detail: bytes | Exception, zones: bytes | Exception):
+    """Stand-in for strava_api.get: detail for /activities/{id}, zones for .../zones."""
+
+    def get(path, token, params=None):
+        result = zones if path.endswith("/zones") else detail
+        if isinstance(result, Exception):
+            raise result
+        return strava_api.StravaResponse(200, {}, result)
+
+    return get
+
+
+def stored(sk=SK) -> dict | None:
+    table = boto3.resource("dynamodb").Table("StravaActivities")
+    return table.get_item(Key={"athleteId": "3634905", "sk": sk}).get("Item")
+
+
+def run_worker(get, record=None):
     from strava.fetch_activity_worker import handler
+
+    with (
+        patch.object(handler.strava_auth, "get_access_token", return_value=("t", "3634905")),
+        patch.object(handler.strava_api, "get", side_effect=get) as mock_get,
+    ):
+        handler.handler(record or sqs_record(), None)
+    return mock_get
+
+
+def test_worker_stores_full_payload_and_zones(aws):
+    from strava.activity_item import decode_raw, sort_key
 
     raw = sample_bytes()
     activity = json.loads(raw)
     sk = sort_key(activity["start_date"], activity["id_str"])
-    with (
-        patch.object(handler.strava_auth, "get_access_token", return_value=("t", "3634905")),
-        patch.object(handler.strava_api, "get", return_value=strava_api.StravaResponse(200, {}, raw)) as get,
-    ):
-        handler.handler(sqs_record(sk=sk), None)
-    assert get.call_args.args[2] == {"include_all_efforts": "true"}
+    get = run_worker(fake_strava(raw, zones_bytes()), sqs_record(sk=sk))
 
-    item = boto3.resource("dynamodb").Table("StravaActivities").get_item(Key={"athleteId": "3634905", "sk": sk})["Item"]
+    paths = [c.args[0] for c in get.call_args_list]
+    assert paths == ["/activities/19084710818", "/activities/19084710818/zones"]
+    assert get.call_args_list[0].args[2] == {"include_all_efforts": "true"}
+
+    item = stored(sk)
     assert item["name"] == activity["name"]
     assert item["segment_effort_count"] == len(activity["segment_efforts"])
     assert decode_raw(item["raw_gzip"].value) == activity  # every field preserved
     assert len(item["raw_gzip"].value) < len(raw) / 4
 
+    assert item["hr_zone_seconds"] == [900, 1800, 2400, 600, 120]
+    assert item["hr_zone_bounds"][-1] == [161, -1]
+    assert item["hr_zone_score"] == 98
+    assert item["power_zone_seconds"] == [1200, 1500, 2700, 420]
+    assert json.loads(gzip.decompress(item["zones_gzip"].value)) == json.loads(zones_bytes())
+    assert item["zones_fetched_at"]
 
-def test_worker_skips_already_stored(aws):
-    from strava.fetch_activity_worker import handler
 
+def test_worker_skips_complete_activity(aws):
     boto3.resource("dynamodb").Table("StravaActivities").put_item(
-        Item={"athleteId": "3634905", "sk": "2026-09-28T07:00:00Z#19084710818"}
+        Item={"athleteId": "3634905", "sk": SK, "zones_fetched_at": "2026-10-19T00:00:00+00:00"}
     )
-    with patch.object(handler.strava_api, "get") as get:
-        handler.handler(sqs_record(), None)
+    get = run_worker(fake_strava(b"", b""))
     get.assert_not_called()
+
+
+def test_worker_fetches_only_zones_for_stored_activity(aws):
+    boto3.resource("dynamodb").Table("StravaActivities").put_item(
+        Item={"athleteId": "3634905", "sk": SK, "name": "Old ride"}
+    )
+    get = run_worker(fake_strava(AssertionError("detail must not be fetched"), zones_bytes()))
+    assert [c.args[0] for c in get.call_args_list] == ["/activities/19084710818/zones"]
+    item = stored()
+    assert item["name"] == "Old ride" and item["power_zone_seconds"] == [1200, 1500, 2700, 420]
+
+
+def test_worker_no_zones_data(aws):
+    run_worker(fake_strava(sample_bytes(), b"[]"))
+    item = stored()
+    assert item["zones_fetched_at"] and "hr_zone_seconds" not in item
+
+
+def test_worker_zones_unavailable_is_recorded_not_retried(aws):
+    run_worker(fake_strava(sample_bytes(), strava_api.StravaHTTPError(402, "payment required")))
+    item = stored()
+    assert item["zones_unavailable"] is True and item["zones_fetched_at"]
 
 
 def test_worker_large_payload_goes_to_s3(aws):
@@ -179,37 +249,44 @@ def test_worker_large_payload_goes_to_s3(aws):
     from strava.fetch_activity_worker import handler
 
     raw = sample_bytes()
-    with (
-        patch.object(handler, "MAX_INLINE_BYTES", 10),
-        patch.object(activity_item, "MAX_INLINE_BYTES", 10),
-        patch.object(handler.strava_auth, "get_access_token", return_value=("t", "3634905")),
-        patch.object(handler.strava_api, "get", return_value=strava_api.StravaResponse(200, {}, raw)),
-    ):
-        handler.handler(sqs_record(), None)
+    with patch.object(handler, "MAX_INLINE_BYTES", 10), patch.object(activity_item, "MAX_INLINE_BYTES", 10):
+        run_worker(fake_strava(raw, zones_bytes()))
 
     key = "strava/activities/19084710818.json.gz"
     obj = boto3.client("s3").get_object(Bucket="test-data-bucket", Key=key)["Body"].read()
     assert json.loads(gzip.decompress(obj)) == json.loads(raw)
+    assert stored()["raw_s3_key"] == key
 
 
-def test_worker_rate_limit_defers_message(aws):
+def test_worker_rate_limit_on_detail_defers_message(aws):
     from strava.fetch_activity_worker import handler
 
     with (
-        patch.object(handler.strava_auth, "get_access_token", return_value=("t", "3634905")),
-        patch.object(handler.strava_api, "get", side_effect=strava_api.RateLimitedError("429")),
         patch.object(handler._sqs, "change_message_visibility") as change,
         pytest.raises(strava_api.RateLimitedError),
     ):
-        handler.handler(sqs_record(), None)
+        run_worker(fake_strava(strava_api.RateLimitedError("429"), zones_bytes()))
     assert change.call_args.kwargs["VisibilityTimeout"] == 900
+    assert stored() is None
 
 
-def test_worker_drops_deleted_activity(aws):
+def test_worker_rate_limit_on_zones_keeps_detail_and_resumes(aws):
     from strava.fetch_activity_worker import handler
 
     with (
-        patch.object(handler.strava_auth, "get_access_token", return_value=("t", "3634905")),
-        patch.object(handler.strava_api, "get", side_effect=strava_api.StravaHTTPError(404, "not found")),
+        patch.object(handler._sqs, "change_message_visibility") as change,
+        pytest.raises(strava_api.RateLimitedError),
     ):
-        handler.handler(sqs_record(), None)  # no exception: message is consumed
+        run_worker(fake_strava(sample_bytes(), strava_api.RateLimitedError("429")))
+    assert change.call_args.kwargs["VisibilityTimeout"] == 900
+    assert stored() and "zones_fetched_at" not in stored()
+
+    # The retry only needs the zones call.
+    get = run_worker(fake_strava(AssertionError("detail must not be refetched"), zones_bytes()))
+    assert [c.args[0] for c in get.call_args_list] == ["/activities/19084710818/zones"]
+    assert stored()["zones_fetched_at"]
+
+
+def test_worker_drops_deleted_activity(aws):
+    run_worker(fake_strava(strava_api.StravaHTTPError(404, "not found"), zones_bytes()))
+    assert stored() is None  # no exception: message is consumed

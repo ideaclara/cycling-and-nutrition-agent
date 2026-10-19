@@ -13,7 +13,8 @@ POST /strava/sync ──────┴─> strava-list-activities
                        SQS strava-activity-fetch-queue  ──(5 failures)──> DLQ
                                ▼
                        strava-fetch-activity-worker
-                               │ GET /activities/{id}?include_all_efforts=true
+                               │ 1. GET /activities/{id}?include_all_efforts=true  (skipped if stored)
+                               │ 2. GET /activities/{id}/zones
                                ▼
                  DynamoDB StravaActivities (+ S3 if payload > 350 KB gzipped)
 ```
@@ -21,6 +22,10 @@ POST /strava/sync ──────┴─> strava-list-activities
 Each item keeps:
 - every **scalar** top-level field as its own attribute (`name`, `distance`, `weighted_average_watts`, `suffer_score` …)
 - the **complete response**, gzip-compressed, in `raw_gzip`
+- **time in zones** from the separate zones call: `hr_zone_seconds` and `power_zone_seconds` (seconds per zone, lowest first), `hr_zone_bounds` and `power_zone_bounds` (`[min, max]` per zone, with `max: -1` for the open top zone), `hr_zone_score`, and the full response gzipped in `zones_gzip`
+- `zones_fetched_at` once the zones call has been made. Rides with no zone data, or where Strava refuses the call (402/403), get `zones_unavailable: true` so they aren't retried.
+
+The two calls are saved separately. If the zones call hits a 429, the detail is already stored, so the retry 15 minutes later makes only the zones call.
 
 Tokens live in the Secrets Manager secret `strava/oauth`. Every Lambda refreshes the token when it is within 5 minutes of expiry.
 
@@ -69,11 +74,23 @@ Sign in to the Amplify app (`AppUrl` output of `CoachFrontend`) and click **Sync
 
 Watch progress in CloudWatch Logs (`/aws/lambda/strava-fetch-activity-worker`) or in the SQS console. Your app's read limit is 200 calls per 15 minutes and 2,000 per day, according to the `x-readratelimit-limit` header from the probe, so a backfill of a few hundred rides takes one or two windows. When the worker hits a 429, it hides the message for 15 minutes and the backfill carries on by itself.
 
+### Zones for activities stored before the zones stage
+
+Activities fetched before the zones stage was added have no `zones_fetched_at`. Queue them once:
+
+```bash
+uv run --project services python scripts/backfill_strava_zones.py --dry-run   # count
+uv run --project services python scripts/backfill_strava_zones.py
+```
+
+The worker sees each one is already stored, so it makes only the zones call: one read per activity.
+
 ## Verify
 
 - `aws dynamodb scan --table-name StravaActivities --select COUNT` matches the number of rides since 1 January on Strava.
 - Running sync again queues 0 or 1 activities. The newest one may be re-listed, but the worker skips it because it is already stored.
 - The DLQ `strava-activity-fetch-dlq` is empty.
+- `scripts/backfill_strava_zones.py --dry-run` reports 0 activities without zones.
 
 ## Cutover
 

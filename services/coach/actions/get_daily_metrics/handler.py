@@ -3,7 +3,8 @@
 Returns one consolidated picture of a day for the coach agent:
 - the DailyFitnessLog entry (Garmin, Xert, TrainingPeaks, DQS, waist)
 - the most recent Withings scale session on or before that day
-- a summary of that day's Strava activities (without the raw payload)
+- a summary of that day's Strava activities, including time in heart-rate and
+  power zones (without the raw payload)
 """
 
 import logging
@@ -36,6 +37,11 @@ ACTIVITY_SUMMARY_FIELDS = (
     "max_heartrate",
     "suffer_score",
     "trainer",
+    # Time in zones (seconds per bucket; bounds are [min, max], max -1 = open-ended)
+    "hr_zone_seconds",
+    "hr_zone_bounds",
+    "power_zone_seconds",
+    "power_zone_bounds",
 )
 
 WITHINGS_FIELDS = (
