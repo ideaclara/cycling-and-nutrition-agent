@@ -12,10 +12,10 @@
     },
     "compare": [
       {
-        "modelId": "REPLACE_ME: Amazon Nova Lite ID"
+        "modelId": "us.amazon.nova-lite-v1:0"
       },
       {
-        "modelId": "REPLACE_ME: Amazon Nova Pro ID"
+        "modelId": "us.amazon.nova-pro-v1:0"
       }
     ],
     "judge": {
