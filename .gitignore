@@ -42,3 +42,6 @@ coverage/
 # Copyrighted knowledge-base source documents (kept local + in private S3 only)
 bedrock/kb-docs/**/*.pdf
 bedrock/kb-docs/**/*.epub
+
+# Local reference output (e.g. `aws bedrock list-inference-profiles`)
+documentation/inference-profiles-us-east-1.txt
