@@ -39,12 +39,10 @@ coverage/
 .env.*
 !.env.example
 
-# Copyrighted knowledge-base source documents (kept local + in private S3 only).
-# Only the small metadata sidecars and the README are tracked.
-bedrock/kb-docs/**
-!bedrock/kb-docs/**/
-!bedrock/kb-docs/**/*.metadata.json
-!bedrock/kb-docs/README.md
+# Proprietary knowledge-base material: the prepared documents, their metadata
+# sidecars and the Module A runbook stay local (and in the private S3 bucket).
+bedrock/kb-docs/
+documentation/labs/A-knowledge-base.md
 
 # Local reference output (e.g. `aws bedrock list-inference-profiles`)
 documentation/inference-profiles-us-east-1.txt
