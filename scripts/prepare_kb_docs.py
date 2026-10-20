@@ -110,7 +110,47 @@ def _math(match: re.Match) -> str:
     return match.group(0)
 
 
+TABLE_ROW = re.compile(r"^\s*\|.*\|\s*$")
+TABLE_RULE = re.compile(r"^\s*\|?(\s*:?-{3,}:?\s*\|)+\s*(:?-{3,}:?\s*)?$")
+TABLE_CAPTION = re.compile(r"^#+\s*(table\s+[\d.]+)", re.IGNORECASE)
+
+
+def _cells(row: str) -> list[str]:
+    return [c.strip().replace("\\|", "|") for c in re.split(r"(?<!\\)\|", row.strip().strip("|"))]
+
+
+def flatten_tables(markdown: str) -> str:
+    """Rewrite each Markdown table row as a labelled list item.
+
+    Bedrock's default parser flattens tables to bare cell text and drops minus
+    signs (`| -1 | -2 |` is indexed as `1 2`), and a chunk that starts mid-table
+    loses its header. `- Table 4.1 — Category: Fatty proteins; 1st Serving: -1`
+    survives both.
+    """
+    lines = markdown.splitlines()
+    out: list[str] = []
+    caption = ""
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        if line.startswith("#"):
+            match = TABLE_CAPTION.match(line)
+            caption = match.group(1).title() if match else ""
+        if TABLE_ROW.match(line) and i + 1 < len(lines) and TABLE_RULE.match(lines[i + 1]):
+            header = _cells(line)
+            i += 2
+            while i < len(lines) and TABLE_ROW.match(lines[i]):
+                pairs = [f"{h}: {c}" if h else c for h, c in zip(header, _cells(lines[i]), strict=False) if c]
+                out.append(f"- {caption + ' — ' if caption else ''}{'; '.join(pairs)}")
+                i += 1
+            continue
+        out.append(line)
+        i += 1
+    return "\n".join(out)
+
+
 def tidy(markdown: str) -> str:
+    markdown = flatten_tables(markdown)
     # Inline maths like $\approx 1.3\text{ g/kg}$ reads (and embeds) better as plain text.
     markdown = MATH_SPAN.sub(_math, markdown)
     lines = [line.rstrip() for line in markdown.splitlines()]
@@ -151,7 +191,8 @@ def clean_friel(raw: str) -> str:
 
 
 def split_front_matter(raw: str) -> tuple[dict, str]:
-    match = re.match(r"---\n(.*?)\n---\n", raw, re.DOTALL)
+    # Chapter 0 has an HTML comment before its front matter.
+    match = re.match(r"\s*(?:<!--.*?-->\s*)*---\n(.*?)\n---\n", raw, re.DOTALL)
     if not match:
         return {}, raw
     fields = {}
