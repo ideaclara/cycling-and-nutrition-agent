@@ -4,6 +4,10 @@ PUT /daily-log/{date}        partial upsert; `null` removes a field
 GET /daily-log/{date}        one day
 GET /daily-log?from=&to=     inclusive range (max 366 days)
 GET /daily-log/schema        field definitions, so the form never drifts from the API
+
+Single-day responses carry an `intervals` object: the Intervals.icu values for
+that day, renamed to daily-log fields. The form shows them as prefills; they
+are never written to DailyFitnessLog unless the user saves them.
 """
 
 import json
@@ -12,7 +16,7 @@ import os
 from dataclasses import asdict
 from datetime import date, timedelta
 
-from common import daily_log_repo, dqs_table
+from common import daily_log_repo, dqs_table, intervals_repo
 from common.daily_log_schema import FIELDS, ValidationError, validate_update
 from common.dates import today
 from common.http import json_body, response
@@ -46,8 +50,15 @@ def get_schema() -> dict:
     )
 
 
+def _with_intervals(day: str, item: dict | None) -> dict | None:
+    intervals = intervals_repo.as_daily_fields(intervals_repo.get(_athlete_id(), day))
+    if not item and not intervals:
+        return None
+    return {**(item or {"date": day}), "intervals": intervals}
+
+
 def get_day(day: str) -> dict:
-    item = daily_log_repo.get(_athlete_id(), day)
+    item = _with_intervals(day, daily_log_repo.get(_athlete_id(), day))
     if not item:
         return response(404, {"message": f"No entry for {day}"})
     return response(200, item)
@@ -67,7 +78,7 @@ def put_day(day: str, event: dict) -> dict:
     to_set, to_remove = validate_update(json_body(event))
     if not to_set and not to_remove:
         raise ValueError("request body has no fields to update")
-    return response(200, daily_log_repo.update(_athlete_id(), day, to_set, to_remove))
+    return response(200, _with_intervals(day, daily_log_repo.update(_athlete_id(), day, to_set, to_remove)))
 
 
 def handler(event, _context):

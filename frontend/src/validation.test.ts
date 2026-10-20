@@ -46,3 +46,19 @@ describe('changedValues', () => {
     expect(changedValues({ waist_cm: 84.5 }, { waist_cm: null })).toEqual({ waist_cm: null });
   });
 });
+
+describe('readings helpers', async () => {
+  const { defaultTime, describeReading } = await import('./ReadingsSection');
+
+  it('defaults to 07:00 on a past day', () => {
+    expect(defaultTime('2026-10-01', new Date('2026-10-20T12:00:00'))).toBe('2026-10-01T07:00');
+  });
+
+  it('describes blood pressure and temperature', () => {
+    const base = { measured_at: '', local_date: '', local_time: '07:00' };
+    expect(describeReading({ ...base, type: 'BP', systolic_mmhg: 118, diastolic_mmhg: 76, pulse_bpm: 52 })).toBe(
+      '118/76 mmHg, pulse 52 bpm',
+    );
+    expect(describeReading({ ...base, type: 'TEMP', temp_c: 36.8 })).toBe('36.8 °C');
+  });
+});

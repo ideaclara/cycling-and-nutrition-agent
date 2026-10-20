@@ -1,7 +1,7 @@
 import { Authenticator } from '@aws-amplify/ui-react';
 import '@aws-amplify/ui-react/styles.css';
 import { useEffect, useState } from 'react';
-import { type Schema, getSchema, syncStrava } from './api';
+import { type Schema, getSchema, syncIntervals, syncStrava } from './api';
 import { DailyLogForm } from './DailyLogForm';
 
 function LoggedIn({ signOut }: { signOut?: () => void }) {
@@ -11,9 +11,17 @@ function LoggedIn({ signOut }: { signOut?: () => void }) {
 
   const onSync = () => {
     setSyncMessage('Syncing…');
-    syncStrava()
-      .then((r) => setSyncMessage(`Strava: ${r?.queued ?? 0} new activities queued`))
-      .catch((err: Error) => setSyncMessage(`Strava sync failed: ${err.message}`));
+    Promise.allSettled([syncStrava(), syncIntervals()]).then(([strava, intervals]) => {
+      const parts = [
+        strava.status === 'fulfilled'
+          ? `Strava: ${strava.value?.queued ?? 0} new activities queued`
+          : `Strava failed: ${strava.reason.message}`,
+        intervals.status === 'fulfilled'
+          ? `Intervals: ${intervals.value?.written ?? 0} days updated`
+          : `Intervals: ${intervals.reason.message}`,
+      ];
+      setSyncMessage(parts.join(' · '));
+    });
   };
 
   useEffect(() => {
@@ -29,7 +37,7 @@ function LoggedIn({ signOut }: { signOut?: () => void }) {
         <div className="header-actions">
           {syncMessage && <span className="muted">{syncMessage}</span>}
           <button type="button" className="link" onClick={onSync}>
-            Sync Strava
+            Sync
           </button>
           <button type="button" className="link" onClick={signOut}>
             Sign out

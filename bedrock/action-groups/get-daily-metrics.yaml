@@ -5,7 +5,8 @@ info:
   description: >-
     Read the athlete's consolidated data for one calendar day: the manual daily log
     (Garmin recovery, Xert fitness signature, TrainingPeaks load, Diet Quality Score,
-    waist measurement), the latest Withings scale reading, and that day's Strava rides.
+    waist measurement), the Intervals.icu wellness and fitness record, blood pressure
+    and temperature readings, the latest Withings scale reading, and that day's Strava rides.
 paths:
   /daily-metrics:
     get:
@@ -14,8 +15,8 @@ paths:
       description: >-
         Use this before giving any training or nutrition recommendation, to ground
         advice in the athlete's actual HRV, sleep, readiness, form (TSB) and recent
-        rides. If daily_log_missing is true, tell the athlete the day has not been
-        logged instead of guessing values.
+        rides. Prefer a value in daily_log when present (the athlete typed it); otherwise
+        use intervals. If both are missing, say the value is unknown instead of guessing.
       parameters:
         - name: date
           in: query
@@ -40,6 +41,19 @@ paths:
                       training_readiness, xert_tp_w, tp_ctl, tp_atl, tp_tsb, dqs_total, waist_cm.
                   daily_log_missing:
                     type: boolean
+                  intervals:
+                    type: object
+                    description: >-
+                      Intervals.icu record for the day (synced from Garmin): hrv (ms), restingHR (bpm),
+                      sleepSecs, sleepScore, readiness, weight (kg), ctl (fitness), atl (fatigue),
+                      rampRate. Form (TSB) is ctl minus atl.
+                  readings:
+                    type: array
+                    description: >-
+                      Manual readings that day, oldest first. type BP has systolic_mmhg, diastolic_mmhg
+                      and pulse_bpm; type TEMP has temp_c. local_time is the athlete's local time.
+                    items:
+                      type: object
                   withings_latest:
                     type: object
                     description: Most recent scale session on or before the day (weight_kg, fat_ratio_pct, ...).

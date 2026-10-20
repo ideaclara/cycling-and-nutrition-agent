@@ -7,6 +7,7 @@ import { CicdStack } from '../lib/cicd-stack';
 import { CoachApiStack } from '../lib/coach-api-stack';
 import { DataStack } from '../lib/data-stack';
 import { FrontendStack } from '../lib/frontend-stack';
+import { IntervalsStack } from '../lib/intervals-stack';
 import { StravaStack } from '../lib/strava-stack';
 import { WithingsStack } from '../lib/withings-stack';
 
@@ -50,6 +51,15 @@ new WithingsStack(app, 'CoachWithings', {
   secretName: 'prod/withings/credentials',
 });
 
+new IntervalsStack(app, 'CoachIntervals', {
+  env,
+  athleteId: ctx('athleteId'),
+  intervalsTable: data.intervalsDaily,
+  httpApi: api.httpApi,
+  authorizer: api.authorizer,
+  backfillStartDate: '2026-01-01',
+});
+
 new CoachApiStack(app, 'CoachApi', {
   env,
   athleteId: ctx('athleteId'),
@@ -57,6 +67,8 @@ new CoachApiStack(app, 'CoachApi', {
   dailyLogTable: data.dailyFitnessLog,
   activitiesTable: data.stravaActivities,
   withingsTable: data.withingsTelemetry,
+  readingsTable: data.manualReadings,
+  intervalsTable: data.intervalsDaily,
   httpApi: api.httpApi,
   authorizer: api.authorizer,
 });

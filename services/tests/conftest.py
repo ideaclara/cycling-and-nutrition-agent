@@ -13,6 +13,11 @@ os.environ.update(
     ACTIVITIES_TABLE="StravaActivities",
     DAILY_LOG_TABLE="DailyFitnessLog",
     WITHINGS_TABLE="WithingsTelemetry",
+    READINGS_TABLE="ManualReadings",
+    INTERVALS_TABLE="IntervalsDaily",
+    INTERVALS_SECRET_ID="intervals/api",
+    ADVICE_TABLE="CoachAdvice",
+    CHAT_TABLE="ChatMessages",
     DATA_BUCKET="test-data-bucket",
     STRAVA_SECRET_ID="strava/oauth",
     BACKFILL_START_EPOCH="1767225600",
@@ -42,6 +47,10 @@ def aws():
         _table(ddb, "StravaActivities", "athleteId", "sk")
         _table(ddb, "DailyFitnessLog", "athleteId", "date")
         _table(ddb, "WithingsTelemetry", "PK", "SK")
+        _table(ddb, "ManualReadings", "athleteId", "sk")
+        _table(ddb, "IntervalsDaily", "athleteId", "date")
+        _table(ddb, "CoachAdvice", "athleteId", "date")
+        _table(ddb, "ChatMessages", "sessionId", "ts")
         boto3.client("s3").create_bucket(Bucket="test-data-bucket")
         queue_url = boto3.client("sqs").create_queue(QueueName="strava-activity-fetch-queue")["QueueUrl"]
         os.environ["FETCH_QUEUE_URL"] = queue_url

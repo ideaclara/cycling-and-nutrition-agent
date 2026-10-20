@@ -19,6 +19,8 @@ export class DataStack extends Stack {
   readonly stravaActivities: dynamodb.Table;
   readonly dailyFitnessLog: dynamodb.Table;
   readonly withingsTelemetry: dynamodb.Table;
+  readonly manualReadings: dynamodb.Table;
+  readonly intervalsDaily: dynamodb.Table;
   readonly dataBucket: s3.Bucket;
   readonly kbSourceBucket: s3.Bucket;
   readonly evalBucket: s3.Bucket;
@@ -55,6 +57,22 @@ export class DataStack extends Stack {
       tableName: 'WithingsTelemetry',
       partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'SK', type: dynamodb.AttributeType.STRING },
+    });
+
+    // Blood pressure and temperature, several a day: SK = "<TYPE>#<ISO-8601 UTC>".
+    this.manualReadings = new dynamodb.Table(this, 'ManualReadings', {
+      ...tableDefaults,
+      tableName: 'ManualReadings',
+      partitionKey: { name: 'athleteId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'sk', type: dynamodb.AttributeType.STRING },
+    });
+
+    // Intervals.icu wellness + fitness/fatigue, one item per day (SK = YYYY-MM-DD).
+    this.intervalsDaily = new dynamodb.Table(this, 'IntervalsDaily', {
+      ...tableDefaults,
+      tableName: 'IntervalsDaily',
+      partitionKey: { name: 'athleteId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'date', type: dynamodb.AttributeType.STRING },
     });
 
     const bucketDefaults = {

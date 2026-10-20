@@ -11,6 +11,8 @@ export interface CoachApiStackProps extends StackProps {
   readonly dailyLogTable: dynamodb.ITable;
   readonly activitiesTable: dynamodb.ITable;
   readonly withingsTable: dynamodb.ITable;
+  readonly readingsTable: dynamodb.ITable;
+  readonly intervalsTable: dynamodb.ITable;
   readonly httpApi: apigw.HttpApi;
   readonly authorizer: apigw.IHttpRouteAuthorizer;
 }
@@ -32,14 +34,20 @@ export class CoachApiStack extends Stack {
       ATHLETE_TIMEZONE: 'Europe/London',
       DAILY_LOG_TABLE: props.dailyLogTable.tableName,
     };
+    const readEnv = {
+      ...baseEnv,
+      INTERVALS_TABLE: props.intervalsTable.tableName,
+      READINGS_TABLE: props.readingsTable.tableName,
+    };
 
     const dailyLogFn = new PythonFunction(this, 'DailyLog', {
       functionName: 'coach-daily-log',
       handlerModule: 'coach/daily_log/handler',
       description: 'Daily fitness log API (manual entry form)',
-      environment: baseEnv,
+      environment: readEnv,
     });
     props.dailyLogTable.grantReadWriteData(dailyLogFn);
+    props.intervalsTable.grantReadData(dailyLogFn);
 
     const integration = new HttpLambdaIntegration('DailyLogIntegration', dailyLogFn);
     const routes: [string, apigw.HttpMethod][] = [
@@ -48,21 +56,28 @@ export class CoachApiStack extends Stack {
       ['/daily-log/{date}', apigw.HttpMethod.GET],
       ['/daily-log/{date}', apigw.HttpMethod.PUT],
     ];
-    routes.forEach(([path, method]) => {
-      new apigw.HttpRoute(this, `Route${method}${path.replace(/[^A-Za-z]/g, '')}`, {
-        httpApi: props.httpApi,
-        routeKey: apigw.HttpRouteKey.with(path, method),
-        integration,
-        authorizer: props.authorizer,
-      });
+    this.addRoutes(props, integration, routes);
+
+    const readingsFn = new PythonFunction(this, 'Readings', {
+      functionName: 'coach-readings',
+      handlerModule: 'coach/readings/handler',
+      description: 'Manual blood pressure and temperature readings API',
+      environment: readEnv,
     });
+    props.readingsTable.grantReadWriteData(readingsFn);
+    this.addRoutes(props, new HttpLambdaIntegration('ReadingsIntegration', readingsFn), [
+      ['/readings', apigw.HttpMethod.GET],
+      ['/readings', apigw.HttpMethod.POST],
+      ['/readings/schema', apigw.HttpMethod.GET],
+      ['/readings/{type}/{ts}', apigw.HttpMethod.DELETE],
+    ]);
 
     const getDailyMetricsFn = new PythonFunction(this, 'GetDailyMetrics', {
       functionName: 'coach-action-get-daily-metrics',
       handlerModule: 'coach/actions/get_daily_metrics/handler',
       description: 'Agent action: consolidated daily metrics (log + Withings + Strava)',
       environment: {
-        ...baseEnv,
+        ...readEnv,
         ACTIVITIES_TABLE: props.activitiesTable.tableName,
         WITHINGS_TABLE: props.withingsTable.tableName,
         WITHINGS_USER_ID: props.withingsUserId,
@@ -71,6 +86,8 @@ export class CoachApiStack extends Stack {
     props.dailyLogTable.grantReadData(getDailyMetricsFn);
     props.activitiesTable.grantReadData(getDailyMetricsFn);
     props.withingsTable.grantReadData(getDailyMetricsFn);
+    props.intervalsTable.grantReadData(getDailyMetricsFn);
+    props.readingsTable.grantReadData(getDailyMetricsFn);
 
     const logDqsFn = new PythonFunction(this, 'LogDqsEntry', {
       functionName: 'coach-action-log-dqs-entry',
@@ -91,5 +108,20 @@ export class CoachApiStack extends Stack {
     new CfnOutput(this, 'GetDailyMetricsArn', { value: getDailyMetricsFn.functionArn });
     new CfnOutput(this, 'LogDqsEntryArn', { value: logDqsFn.functionArn });
     new CfnOutput(this, 'CalculateRampRateArn', { value: rampRateFn.functionArn });
+  }
+
+  private addRoutes(
+    props: CoachApiStackProps,
+    integration: apigw.HttpRouteIntegration,
+    routes: [string, apigw.HttpMethod][],
+  ): void {
+    routes.forEach(([path, method]) => {
+      new apigw.HttpRoute(this, `Route${method}${path.replace(/[^A-Za-z]/g, '')}`, {
+        httpApi: props.httpApi,
+        routeKey: apigw.HttpRouteKey.with(path, method),
+        integration,
+        authorizer: props.authorizer,
+      });
+    });
   }
 }

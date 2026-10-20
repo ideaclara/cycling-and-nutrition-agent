@@ -70,3 +70,19 @@ def test_schema_route_exposes_waist(aws):
     assert status == 200
     assert body["fields"]["waist_cm"]["minimum"] == 50
     assert body["fields"]["waist_cm"]["maximum"] == 150
+
+
+def test_intervals_values_are_returned_as_prefills(aws):
+    import boto3
+
+    boto3.resource("dynamodb").Table("IntervalsDaily").put_item(
+        Item={"athleteId": "3634905", "date": "2026-10-20", "hrv": 58, "ctl": 60, "atl": 65}
+    )
+    status, item = call(http_event("GET /daily-log/{date}", {"date": "2026-10-20"}))
+    assert status == 200
+    assert item["intervals"] == {"hrv_overnight_avg_ms": 58, "tp_ctl": 60, "tp_atl": 65, "tp_tsb": -5}
+    assert "hrv_overnight_avg_ms" not in item  # not copied into the manual log
+
+    status, item = call(http_event("PUT /daily-log/{date}", {"date": "2026-10-20"}, body={"hrv_overnight_avg_ms": 55}))
+    assert item["hrv_overnight_avg_ms"] == 55
+    assert item["intervals"]["hrv_overnight_avg_ms"] == 58

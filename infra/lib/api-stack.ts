@@ -44,7 +44,12 @@ export class ApiStack extends Stack {
       // Amplify domain doesn't need to be known before the frontend stack exists.
       corsPreflight: {
         allowOrigins: ['*'],
-        allowMethods: [apigw.CorsHttpMethod.GET, apigw.CorsHttpMethod.PUT, apigw.CorsHttpMethod.POST],
+        allowMethods: [
+          apigw.CorsHttpMethod.GET,
+          apigw.CorsHttpMethod.PUT,
+          apigw.CorsHttpMethod.POST,
+          apigw.CorsHttpMethod.DELETE,
+        ],
         allowHeaders: ['Authorization', 'Content-Type'],
         maxAge: Duration.hours(1),
       },

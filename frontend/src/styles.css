@@ -145,3 +145,32 @@ button.link {
   color: var(--accent);
   padding: 0;
 }
+
+.hint {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+select {
+  font: inherit;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+ul.readings {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+ul.readings li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}

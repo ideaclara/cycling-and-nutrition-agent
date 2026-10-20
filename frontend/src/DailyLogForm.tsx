@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ApiError, type DailyLog, type FieldDef, type Schema, getDay, putDay } from './api';
+import { ReadingsSection } from './ReadingsSection';
 import { changedValues, parseField, stepFor } from './validation';
 
 const GROUPS: { id: FieldDef['group']; title: string }[] = [
@@ -11,12 +12,13 @@ const GROUPS: { id: FieldDef['group']; title: string }[] = [
 
 const label = (category: string) => category.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
 
-function localToday(): string {
+export function localToday(): string {
   const now = new Date();
   return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
 }
 
-type Status = { kind: 'idle' } | { kind: 'loading' } | { kind: 'saved'; at: string } | { kind: 'error'; message: string };
+type Status =
+  { kind: 'idle' } | { kind: 'loading' } | { kind: 'saved'; at: string } | { kind: 'error'; message: string };
 
 export function DailyLogForm({ schema }: { schema: Schema }) {
   const [date, setDate] = useState(localToday);
@@ -89,84 +91,97 @@ export function DailyLogForm({ schema }: { schema: Schema }) {
     }
   };
 
+  const prefill = loaded.intervals ?? {};
+
   return (
-    <form onSubmit={onSubmit} noValidate>
-      <div className="date-row">
-        <label>
-          Date
-          <input type="date" value={date} max={localToday()} onChange={(e) => {
-              setStatus({ kind: 'loading' });
-              setDate(e.target.value);
-            }}
-            required
-          />
-        </label>
-        {status.kind === 'loading' && <span className="muted">Loading…</span>}
-      </div>
+    <>
+      <form onSubmit={onSubmit} noValidate>
+        <div className="date-row">
+          <label>
+            Date
+            <input
+              type="date"
+              value={date}
+              max={localToday()}
+              onChange={(e) => {
+                setStatus({ kind: 'loading' });
+                setDate(e.target.value);
+              }}
+              required
+            />
+          </label>
+          {status.kind === 'loading' && <span className="muted">Loading…</span>}
+        </div>
 
-      {GROUPS.map((group) => (
-        <fieldset key={group.id}>
-          <legend>{group.title}</legend>
-          <div className="grid">
-            {Object.entries(schema.fields)
-              .filter(([, def]) => def.group === group.id)
-              .map(([name, def]) => (
-                <label key={name} className={errors[name] ? 'invalid' : undefined}>
-                  {def.label}
-                  {def.unit && <span className="unit"> ({def.unit})</span>}
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    name={name}
-                    min={def.minimum}
-                    max={def.maximum}
-                    step={stepFor(def)}
-                    value={inputs[name] ?? ''}
-                    onChange={(e) => setInputs({ ...inputs, [name]: e.target.value })}
-                  />
-                  {errors[name] && <span className="error">{errors[name]}</span>}
-                </label>
-              ))}
-          </div>
-        </fieldset>
-      ))}
-
-      <fieldset>
-        <legend>
-          Diet Quality Score — servings
-          {loaded.dqs_total != null && <span className="dqs-total">DQS {loaded.dqs_total}</span>}
-        </legend>
-        {(['high_quality', 'low_quality'] as const).map((quality) => (
-          <div key={quality}>
-            <h3>{quality === 'high_quality' ? 'High quality' : 'Low quality'}</h3>
+        {GROUPS.map((group) => (
+          <fieldset key={group.id}>
+            <legend>{group.title}</legend>
             <div className="grid">
-              {schema.dqs_categories[quality].map((category) => (
-                <label key={category} className={errors[`dqs_${category}`] ? 'invalid' : undefined}>
-                  {label(category)}
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    min={0}
-                    max={20}
-                    step={0.5}
-                    value={servings[category] ?? ''}
-                    onChange={(e) => setServings({ ...servings, [category]: e.target.value })}
-                  />
-                  {errors[`dqs_${category}`] && <span className="error">{errors[`dqs_${category}`]}</span>}
-                </label>
-              ))}
+              {Object.entries(schema.fields)
+                .filter(([, def]) => def.group === group.id)
+                .map(([name, def]) => (
+                  <label key={name} className={errors[name] ? 'invalid' : undefined}>
+                    {def.label}
+                    {def.unit && <span className="unit"> ({def.unit})</span>}
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      name={name}
+                      placeholder={prefill[name] != null ? String(prefill[name]) : undefined}
+                      min={def.minimum}
+                      max={def.maximum}
+                      step={stepFor(def)}
+                      value={inputs[name] ?? ''}
+                      onChange={(e) => setInputs({ ...inputs, [name]: e.target.value })}
+                    />
+                    {prefill[name] != null && (inputs[name] ?? '') === '' && (
+                      <span className="hint">From Intervals.icu</span>
+                    )}
+                    {errors[name] && <span className="error">{errors[name]}</span>}
+                  </label>
+                ))}
             </div>
-          </div>
+          </fieldset>
         ))}
-      </fieldset>
 
-      <div className="actions">
-        <button type="submit" disabled={status.kind === 'loading'}>
-          Save
-        </button>
-        {status.kind === 'saved' && <span className="ok">Saved ({status.at})</span>}
-        {status.kind === 'error' && <span className="error">{status.message}</span>}
-      </div>
-    </form>
+        <fieldset>
+          <legend>
+            Diet Quality Score — servings
+            {loaded.dqs_total != null && <span className="dqs-total">DQS {loaded.dqs_total}</span>}
+          </legend>
+          {(['high_quality', 'low_quality'] as const).map((quality) => (
+            <div key={quality}>
+              <h3>{quality === 'high_quality' ? 'High quality' : 'Low quality'}</h3>
+              <div className="grid">
+                {schema.dqs_categories[quality].map((category) => (
+                  <label key={category} className={errors[`dqs_${category}`] ? 'invalid' : undefined}>
+                    {label(category)}
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      max={20}
+                      step={0.5}
+                      value={servings[category] ?? ''}
+                      onChange={(e) => setServings({ ...servings, [category]: e.target.value })}
+                    />
+                    {errors[`dqs_${category}`] && <span className="error">{errors[`dqs_${category}`]}</span>}
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
+        </fieldset>
+
+        <div className="actions">
+          <button type="submit" disabled={status.kind === 'loading'}>
+            Save
+          </button>
+          {status.kind === 'saved' && <span className="ok">Saved ({status.at})</span>}
+          {status.kind === 'error' && <span className="error">{status.message}</span>}
+        </div>
+      </form>
+      <ReadingsSection key={date} date={date} />
+    </>
   );
 }

@@ -5,7 +5,7 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL as string;
 /** Mirrors `Field` in services/common/daily_log_schema.py (served by GET /daily-log/schema). */
 export interface FieldDef {
   label: string;
-  group: 'garmin' | 'xert' | 'trainingpeaks' | 'body';
+  group: string;
   minimum: number;
   maximum: number;
   integer: boolean;
@@ -22,6 +22,21 @@ export type DailyLog = Record<string, unknown> & {
   date?: string;
   dqs_servings?: Record<string, number>;
   dqs_total?: number;
+  /** Intervals.icu values for the day, keyed by daily-log field. Shown as prefills, never saved automatically. */
+  intervals?: Record<string, number>;
+};
+
+export type ReadingType = 'BP' | 'TEMP';
+
+export interface ReadingsSchema {
+  types: Record<ReadingType, Record<string, FieldDef>>;
+}
+
+export type Reading = Record<string, number | string> & {
+  type: ReadingType;
+  measured_at: string;
+  local_date: string;
+  local_time: string;
 };
 
 export class ApiError extends Error {
@@ -51,4 +66,13 @@ export const getSchema = () => request<Schema>('/daily-log/schema');
 export const getDay = (date: string) => request<DailyLog>(`/daily-log/${date}`);
 export const putDay = (date: string, changes: Record<string, unknown>) =>
   request<DailyLog>(`/daily-log/${date}`, { method: 'PUT', body: JSON.stringify(changes) });
+export const syncIntervals = () =>
+  request<{ fetched: number; written: number }>('/intervals/sync', { method: 'POST' });
+export const getReadingsSchema = () => request<ReadingsSchema>('/readings/schema');
+export const getReadings = (from: string, to: string) =>
+  request<{ items: Reading[] }>(`/readings?from=${from}&to=${to}`);
+export const postReading = (reading: Record<string, unknown>) =>
+  request<Reading>('/readings', { method: 'POST', body: JSON.stringify(reading) });
+export const deleteReading = (type: ReadingType, measuredAt: string) =>
+  request<{ deleted: string }>(`/readings/${type}/${encodeURIComponent(measuredAt)}`, { method: 'DELETE' });
 export const syncStrava = () => request<{ message: string; queued: number }>('/strava/sync', { method: 'POST' });
