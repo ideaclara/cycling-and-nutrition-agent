@@ -11,7 +11,7 @@ export interface CicdStackProps extends StackProps {
    */
   readonly githubSubjectPrefix: string;
   readonly amplifyAppId: string;
-  readonly kbSourceBucketArn: string;
+  readonly dataBucketArn: string;
   readonly evalBucketArn: string;
 }
 
@@ -23,7 +23,7 @@ export interface CicdStackProps extends StackProps {
  * environment to the `main` branch in GitHub's environment settings.
  *
  * It can deploy CDK (by assuming the CDK bootstrap roles), deploy the Amplify
- * frontend and sync schemas/eval data to S3. It has NO Bedrock permissions:
+ * frontend and sync action-group schemas (data bucket) and eval data to S3. It has NO Bedrock permissions:
  * Bedrock resources are built by hand in the console.
  */
 export class CicdStack extends Stack {
@@ -77,8 +77,8 @@ export class CicdStack extends Stack {
       new iam.PolicyStatement({
         actions: ['s3:ListBucket', 's3:GetObject', 's3:PutObject', 's3:DeleteObject'],
         resources: [
-          props.kbSourceBucketArn,
-          `${props.kbSourceBucketArn}/schemas/*`,
+          props.dataBucketArn,
+          `${props.dataBucketArn}/schemas/*`,
           props.evalBucketArn,
           `${props.evalBucketArn}/datasets/*`,
         ],

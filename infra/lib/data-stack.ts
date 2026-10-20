@@ -64,11 +64,14 @@ export class DataStack extends Stack {
       removalPolicy: RemovalPolicy.RETAIN,
     };
 
-    // Overflow store for Strava activity payloads too large for a DynamoDB item.
+    // Overflow store for Strava activity payloads too large for a DynamoDB item,
+    // plus the action-group OpenAPI schemas (schemas/) synced by CI.
     this.dataBucket = new s3.Bucket(this, 'DataBucket', bucketDefaults);
 
     // Reference documents for the Bedrock Knowledge Base (periodisation/,
     // nutrition/, power_models/). Versioned so re-uploads can be compared.
+    // Nothing else goes in here: a Knowledge Base data source ingests every
+    // supported file in the bucket.
     this.kbSourceBucket = new s3.Bucket(this, 'KbSourceBucket', { ...bucketDefaults, versioned: true });
 
     // eval_dataset.jsonl and Bedrock evaluation job output.

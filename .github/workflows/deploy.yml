@@ -59,7 +59,7 @@ jobs:
             echo "user_pool_id=$(out CoachApiGateway UserPoolId)"
             echo "user_pool_client_id=$(out CoachApiGateway UserPoolClientId)"
             echo "amplify_app_id=$(out CoachFrontend AmplifyAppId)"
-            echo "kb_bucket=$(out CoachData KbSourceBucketName)"
+            echo "data_bucket=$(out CoachData DataBucketName)"
             echo "eval_bucket=$(out CoachData EvalBucketName)"
           } >> "$GITHUB_OUTPUT"
 
@@ -94,7 +94,7 @@ jobs:
 
       - name: Sync action-group schemas and eval datasets to S3
         run: |
-          aws s3 sync bedrock/action-groups "s3://${{ steps.outputs.outputs.kb_bucket }}/schemas/" --delete
+          aws s3 sync bedrock/action-groups "s3://${{ steps.outputs.outputs.data_bucket }}/schemas/" --delete
           if [ -d bedrock/eval ] && ls bedrock/eval/*.jsonl >/dev/null 2>&1; then
             aws s3 sync bedrock/eval "s3://${{ steps.outputs.outputs.eval_bucket }}/datasets/" --exclude '*' --include '*.jsonl'
           fi

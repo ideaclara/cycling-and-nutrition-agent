@@ -1,0 +1,12 @@
+# Module A retrieval test set: one query per line. Mix of narrow facts,
+# broad concepts and cross-domain questions, so chunking differences show up.
+How should training intensity change during a recovery week?
+What is the difference between the base, build and peak periods?
+How much carbohydrate per hour should I eat on a ride longer than three hours?
+How much protein should an endurance athlete eat after a hard session?
+What are the warning signs of low energy availability (RED-S)?
+How does Diet Quality Score treat refined grains and sweets?
+What does Xert mean by high intensity energy (HIE) and peak power (PP)?
+What is the relationship between functional threshold power and training zones?
+How quickly can chronic training load safely increase each week?
+Should I lose weight during a heavy training block?

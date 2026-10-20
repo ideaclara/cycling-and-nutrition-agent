@@ -72,6 +72,6 @@ new CicdStack(app, 'CoachCicd', {
   env,
   githubSubjectPrefix: ctx('githubSubjectPrefix'),
   amplifyAppId: frontend.appId,
-  kbSourceBucketArn: data.kbSourceBucket.bucketArn,
+  dataBucketArn: data.dataBucket.bucketArn,
   evalBucketArn: data.evalBucket.bucketArn,
 });
