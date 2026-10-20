@@ -79,18 +79,18 @@ def test_front_matter_after_html_comment_is_removed():
 
 def test_flatten_tables_keeps_signs_and_headers():
     markdown = (
-        "### Table 4.1: How to Score Your Diet Quality\n\n"
+        "### Table 4.1: Diet Score\n\n"
         "| Tier | Category | 1st Serving | 2nd Serving |\n"
         "| :--- | :--- | :---: | ---: |\n"
-        "| High Quality | Fruits | +2 | +1 |\n"
+        "| High Quality | **Fruits** | +2 | +1 |\n"
         "| Low Quality | Fatty proteins | -1 | -2 |\n\n"
         "## Notes\n\n| A | B |\n|---|---|\n| x \\| y | |\n"
     )
     assert kb.flatten_tables(markdown) == (
-        "### Table 4.1: How to Score Your Diet Quality\n\n"
-        "- Table 4.1 — Tier: High Quality; Category: Fruits; 1st Serving: +2; 2nd Serving: +1\n"
-        "- Table 4.1 — Tier: Low Quality; Category: Fatty proteins; 1st Serving: -1; 2nd Serving: -2\n\n"
-        "## Notes\n\n- A: x | y"
+        "### Table 4.1: Diet Score\n\n"
+        "- Table 4.1, Diet Score — Tier: High Quality; Category: Fruits; 1st Serving: +2; 2nd Serving: +1\n"
+        "- Table 4.1, Diet Score — Tier: Low Quality; Category: Fatty proteins; 1st Serving: -1; 2nd Serving: -2\n\n"
+        "## Notes\n\n- Notes — A: x | y"
     )
 
 

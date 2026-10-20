@@ -112,11 +112,15 @@ def _math(match: re.Match) -> str:
 
 TABLE_ROW = re.compile(r"^\s*\|.*\|\s*$")
 TABLE_RULE = re.compile(r"^\s*\|?(\s*:?-{3,}:?\s*\|)+\s*(:?-{3,}:?\s*)?$")
-TABLE_CAPTION = re.compile(r"^#+\s*(table\s+[\d.]+)", re.IGNORECASE)
+TABLE_CAPTION = re.compile(r"^(table\s+[\d.]+)\s*[:.\-–—]\s*(.+)$", re.IGNORECASE)
+
+
+def _plain(text: str) -> str:
+    return re.sub(r"\*\*|__|`", "", text).strip()
 
 
 def _cells(row: str) -> list[str]:
-    return [c.strip().replace("\\|", "|") for c in re.split(r"(?<!\\)\|", row.strip().strip("|"))]
+    return [_plain(c).replace("\\|", "|") for c in re.split(r"(?<!\\)\|", row.strip().strip("|"))]
 
 
 def flatten_tables(markdown: str) -> str:
@@ -124,8 +128,10 @@ def flatten_tables(markdown: str) -> str:
 
     Bedrock's default parser flattens tables to bare cell text and drops minus
     signs (`| -1 | -2 |` is indexed as `1 2`), and a chunk that starts mid-table
-    loses its header. `- Table 4.1 — Category: Fatty proteins; 1st Serving: -1`
-    survives both.
+    loses its header. Each row also carries the nearest heading, with a table
+    caption shortened to "Table 4.1, How to Score…", so it matches questions
+    phrased in the table's own words:
+    `- Table 4.1, How to Score… — Category: Fatty proteins; 1st Serving: -1`
     """
     lines = markdown.splitlines()
     out: list[str] = []
@@ -134,8 +140,9 @@ def flatten_tables(markdown: str) -> str:
     while i < len(lines):
         line = lines[i]
         if line.startswith("#"):
-            match = TABLE_CAPTION.match(line)
-            caption = match.group(1).title() if match else ""
+            heading = _plain(line.lstrip("#"))
+            match = TABLE_CAPTION.match(heading)
+            caption = f"{match.group(1).title()}, {match.group(2)}" if match else heading
         if TABLE_ROW.match(line) and i + 1 < len(lines) and TABLE_RULE.match(lines[i + 1]):
             header = _cells(line)
             i += 2
