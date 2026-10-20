@@ -77,21 +77,47 @@ def test_front_matter_after_html_comment_is_removed():
     assert metadata["section"] == "Chapter 00: Preface"
 
 
-def test_flatten_tables_keeps_signs_and_headers():
-    markdown = (
-        "### Table 4.1: Diet Score\n\n"
-        "| Tier | Category | 1st Serving | 2nd Serving |\n"
-        "| :--- | :--- | :---: | ---: |\n"
-        "| High Quality | **Fruits** | +2 | +1 |\n"
-        "| Low Quality | Fatty proteins | -1 | -2 |\n\n"
-        "## Notes\n\n| A | B |\n|---|---|\n| x \\| y | |\n"
+TABLE_MARKDOWN = (
+    "# Racing Weight: Chapter 4\n\n## Structured Data\n\n### Table 4.1: Diet Score\n\n"
+    "| Tier | Category | 1st Serving | 2nd Serving |\n"
+    "| :--- | :--- | :---: | ---: |\n"
+    "| High Quality | **Fruits** | +2 | +1 |\n"
+    "| Low Quality | Fatty proteins | -1 | -2 |\n"
+    "| Low Quality | Sweets | -2 | -2 |\n\n"
+    "## Notes\n\n| A | B |\n|---|---|\n| x \\| y | |\n"
+)
+
+
+def test_extract_tables_leaves_pointers_and_keeps_heading_paths():
+    text, tables = kb.extract_tables(TABLE_MARKDOWN)
+    assert "|" not in text.replace("x | y", "")
+    assert "_(Table 4.1, Diet Score: indexed as a separate table document.)_" in text
+    assert "_(Notes: indexed as a separate table document.)_" in text
+    first, second = tables
+    assert first.path == ["Racing Weight: Chapter 4", "Structured Data"]
+    assert first.caption == "Table 4.1, Diet Score"
+    assert first.rows[1] == ["Low Quality", "Fatty proteins", "-1", "-2"]
+    assert second.caption == "Notes"
+    assert second.rows == [["x | y", ""]]
+
+
+def test_table_doc_keeps_signs_and_summarises_rows():
+    _, tables = kb.extract_tables(TABLE_MARKDOWN)
+    assert kb.table_doc(tables[0], "Racing Weight, by Matt Fitzgerald") == (
+        "# Racing Weight: Chapter 4: Table 4.1, Diet Score\n\n"
+        "Source: Racing Weight, by Matt Fitzgerald\n\n"
+        "_Structured Data_\n\n"
+        "Table 4.1, Diet Score, a table of 3 rows with the columns Tier, Category, 1st Serving, 2nd Serving. "
+        "Rows: Fruits, Fatty proteins, Sweets.\n\n"
+        "- Tier: High Quality; Category: Fruits; 1st Serving: +2; 2nd Serving: +1\n"
+        "- Tier: Low Quality; Category: Fatty proteins; 1st Serving: -1; 2nd Serving: -2\n"
+        "- Tier: Low Quality; Category: Sweets; 1st Serving: -2; 2nd Serving: -2\n"
     )
-    assert kb.flatten_tables(markdown) == (
-        "### Table 4.1: Diet Score\n\n"
-        "- Table 4.1, Diet Score — Tier: High Quality; Category: Fruits; 1st Serving: +2; 2nd Serving: +1\n"
-        "- Table 4.1, Diet Score — Tier: Low Quality; Category: Fatty proteins; 1st Serving: -1; 2nd Serving: -2\n\n"
-        "## Notes\n\n- Notes — A: x | y"
-    )
+
+
+def test_short_cuts_on_a_word_boundary():
+    assert kb._short("Green – Very Fresh: Low & High systems prepared", 20) == "Green – Very Fresh…"
+    assert kb._short("Endurance", 20) == "Endurance"
 
 
 def test_tidy_turns_inline_latex_into_text_but_leaves_currency():

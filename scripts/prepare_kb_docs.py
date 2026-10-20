@@ -1,17 +1,20 @@
 """Build the clean Knowledge Base source tree from the raw reference documents.
 
-Reads SOURCE (never modifies it) and rebuilds bedrock/kb-docs/{library,papers}/:
+Reads SOURCE (never modifies it) and rebuilds bedrock/kb-docs/{library,tables,papers}/:
 
-    library/   Markdown for the default parser
+    library/   Markdown for the default parser, tables replaced by a pointer line
       periodisation/friel-cyclists-training-bible.md
       nutrition/racing-weight/chapter-04-improving-your-diet-quality.md
       power_models/allen-coggan/training-and-racing-with-a-power-meter.md
       power_models/xert/high-intensity-energy-hie.md
+    tables/    one document per table, for a data source with no chunking
+      nutrition/racing-weight/chapter-04-improving-your-diet-quality/table-4-1-how-to-score-your-diet-quality-dqs.md
     papers/    PDFs for the foundation-model parser, reference lists removed
       nutrition/ioc-reds-2023.pdf
 
 Every document gets a `<file>.metadata.json` sidecar with `domain`, `source_type`
-and `title` (plus `year`, `chapter`, `xert_section`, `source_url` where known).
+`title` and `content_type` (`text` or `table`), plus `year`, `chapter`, `section`,
+`xert_section` and `source_url` where known.
 
     uv run --project services python scripts/prepare_kb_docs.py "~/Documents/Racing/S3 Vectors Folder"
 """
@@ -24,6 +27,7 @@ import re
 import shutil
 import sys
 import unicodedata
+from dataclasses import dataclass
 from pathlib import Path
 
 from bs4 import BeautifulSoup
@@ -123,41 +127,85 @@ def _cells(row: str) -> list[str]:
     return [_plain(c).replace("\\|", "|") for c in re.split(r"(?<!\\)\|", row.strip().strip("|"))]
 
 
-def flatten_tables(markdown: str) -> str:
-    """Rewrite each Markdown table row as a labelled list item.
+@dataclass
+class Table:
+    path: list[str]  # headings above the table, outermost first, without the caption's
+    caption: str  # "Table 3.1, Power-Based Training Levels", or the nearest heading
+    header: list[str]
+    rows: list[list[str]]
 
-    Bedrock's default parser flattens tables to bare cell text and drops minus
-    signs (`| -1 | -2 |` is indexed as `1 2`), and a chunk that starts mid-table
-    loses its header. Each row also carries the nearest heading, with a table
-    caption shortened to "Table 4.1, How to Score…", so it matches questions
-    phrased in the table's own words:
-    `- Table 4.1, How to Score… — Category: Fatty proteins; 1st Serving: -1`
+
+def extract_tables(markdown: str) -> tuple[str, list[Table]]:
+    """Move each Markdown table out of the text, leaving a one-line pointer.
+
+    Tables go to their own documents in the `tables` data source (no chunking),
+    so each one is retrieved whole, with its headings and a summary to match on.
     """
     lines = markdown.splitlines()
     out: list[str] = []
-    caption = ""
+    tables: list[Table] = []
+    path: list[str] = []
     i = 0
     while i < len(lines):
         line = lines[i]
-        if line.startswith("#"):
-            heading = _plain(line.lstrip("#"))
-            match = TABLE_CAPTION.match(heading)
-            caption = f"{match.group(1).title()}, {match.group(2)}" if match else heading
+        heading = re.match(r"^(#+)\s+(.*)", line)
+        if heading:
+            level = len(heading.group(1))
+            path = path[: level - 1] + [""] * (level - 1 - len(path)) + [_plain(heading.group(2))]
         if TABLE_ROW.match(line) and i + 1 < len(lines) and TABLE_RULE.match(lines[i + 1]):
             header = _cells(line)
+            rows = []
             i += 2
             while i < len(lines) and TABLE_ROW.match(lines[i]):
-                pairs = [f"{h}: {c}" if h else c for h, c in zip(header, _cells(lines[i]), strict=False) if c]
-                out.append(f"- {caption + ' — ' if caption else ''}{'; '.join(pairs)}")
+                rows.append(_cells(lines[i]))
                 i += 1
+            nearest = next((h for h in reversed(path) if h), "Table")
+            match = TABLE_CAPTION.match(nearest)
+            caption = f"{match.group(1).title()}, {match.group(2)}" if match else nearest
+            # The heading that became the caption isn't repeated in the path.
+            tables.append(Table([h for h in path if h and h != nearest], caption, header, rows))
+            out.append(f"_({caption}: indexed as a separate table document.)_")
             continue
         out.append(line)
         i += 1
-    return "\n".join(out)
+    return "\n".join(out), tables
+
+
+def _short(text: str, limit: int) -> str:
+    return text if len(text) <= limit else text[:limit].rsplit(" ", 1)[0].rstrip(",;:–-") + "…"
+
+
+def table_doc(table: Table, source: str = "") -> str:
+    """The table as one self-contained document: headings, source, summary, then one line per row.
+
+    Rows stay as `Column: value` lines because Bedrock's default parser flattens
+    Markdown tables to bare cell text and drops minus signs (`| -1 |` becomes `1`).
+    The source line names the book and authors, which a chapter heading alone doesn't.
+    """
+    title, *rest = table.path or [table.caption]
+    where = " › ".join(rest)
+    # Summarise by the column that names the most things (e.g. "Fruits", "Endurance"), not one of numbers.
+    columns = list(zip(*[r + [""] * (len(table.header) - len(r)) for r in table.rows], strict=False))
+    naming = [c for c in columns if sum(not re.fullmatch(r"[\d\s.,%<>+\-–]*", v) for v in c) > len(c) / 2]
+    names = max(naming, key=lambda c: len(set(c)), default=columns[0] if columns else ())
+    row_names = ", ".join(dict.fromkeys(_short(v, 40) for v in names if v))
+    summary = (
+        f"{table.caption}, a table of {len(table.rows)} rows with the columns "
+        f"{', '.join(h for h in table.header if h)}. Rows: {_short(row_names, 300)}."
+    )
+    lines = [f"# {title}: {table.caption}", ""]
+    if source and source not in title:
+        lines += [f"Source: {source}", ""]
+    if where:
+        lines += [f"_{where}_", ""]
+    lines += [summary, ""]
+    for row in table.rows:
+        pairs = [f"{h}: {c}" if h else c for h, c in zip(table.header, row, strict=False) if c]
+        lines.append(f"- {'; '.join(pairs)}")
+    return "\n".join(lines) + "\n"
 
 
 def tidy(markdown: str) -> str:
-    markdown = flatten_tables(markdown)
     # Inline maths like $\approx 1.3\text{ g/kg}$ reads (and embeds) better as plain text.
     markdown = MATH_SPAN.sub(_math, markdown)
     lines = [line.rstrip() for line in markdown.splitlines()]
@@ -165,6 +213,20 @@ def tidy(markdown: str) -> str:
 
 
 def write(rel: str, text_or_bytes, metadata: dict, report: list) -> None:
+    if rel.startswith("library/"):
+        text_or_bytes, tables = extract_tables(text_or_bytes)
+        metadata = {**metadata, "content_type": "text"}
+        stem = rel.removeprefix("library/").removesuffix(".md")
+        source = ", by ".join(filter(None, [metadata.get("title"), metadata.get("authors")]))
+        names: set[str] = set()
+        for table in tables:
+            name = slugify(table.caption)[:70]
+            while name in names:
+                name += "-2"
+            names.add(name)
+            extra = {"content_type": "table", "section": table.caption[:120]}
+            write(f"tables/{stem}/{name}.md", tidy(table_doc(table, source)), {**metadata, **extra}, report)
+        text_or_bytes = tidy(text_or_bytes)
     path = OUT / rel
     path.parent.mkdir(parents=True, exist_ok=True)
     if isinstance(text_or_bytes, bytes):
@@ -283,7 +345,7 @@ def main():
     if not (src / "nutrition").is_dir():
         sys.exit(f"{src} has no nutrition/ folder")
 
-    for sub in ("library", "papers"):
+    for sub in ("library", "tables", "papers"):
         shutil.rmtree(OUT / sub, ignore_errors=True)
     report: list[tuple[str, str, str]] = []
 
