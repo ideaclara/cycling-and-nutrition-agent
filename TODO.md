@@ -24,3 +24,52 @@ table for citation, but the coach should use these values from a tool.
      and `dqs_score(servings)` as tools. This is more work, but it teaches MCP:
      tool schemas, transports, and how an agent discovers and calls tools.
      It can be tested from Claude Code before any Bedrock wiring.
+
+## Coach v2
+
+The full plan, with design notes, is in `documentation/coach-v2-plan.md`. Work
+through it one milestone per Claude session.
+
+### Lab modules (runbooks in `documentation/labs/`, Bedrock built by hand)
+
+- [x] **A. Knowledge Bases**: `coach-kb-semantic-v2` with reranking (library, tables, papers)
+- [ ] **B. Guardrails**: denied topics (high intensity on suppressed HRV, extreme
+      deficits, medical and eating-disorder diagnosis), content and prompt-attack
+      filters, PII, contextual grounding, versions, `ApplyGuardrail`
+- [ ] **C. Bedrock Agents**: three action groups, KB, guardrail, alias, traces,
+      idle-cost check; optional supervisor with collaborators. Backs the chat page.
+- [ ] **D. Flows**: inputs → KB retrieval → prompt → guardrail → output. Daily advice v3.
+- [ ] **E. Prompt Management**: versioned prompts, model comparison, optimization. Daily advice v2.
+- [ ] **F. Evaluation**: ~40 scenarios (including eating behaviour), LLM-as-a-judge, KB RAG evaluation
+- [ ] **G. AgentCore**: Strands agent on Runtime (microVM, short idle timeout),
+      Gateway exposing the Lambdas as MCP tools, Memory. Second chat backend.
+- [ ] **H. (optional) MCP server**: `power_levels`, `carb_target`, `dqs_score`,
+      `route_forecast` (see "Reference tables as deterministic data" above)
+
+### Milestones
+
+1. [ ] Intervals.icu ingestion (`IntervalsDaily`), then the **form field review**:
+       for each Garmin, TrainingPeaks, Xert, body and DQS field, decide remove,
+       prefill from Intervals, or keep manual. Plus BP and body temperature
+       readings with timestamps (`ManualReadings`).
+2. [ ] Eating-behaviour KB: review the strategy doc, gap analysis, proposed
+       open-access sources, `eating_behaviour/` handler in `prepare_kb_docs.py`
+3. [ ] Module B runbook
+4. [ ] Analysis page: design discussion, then `GET /analysis/series` and charts
+5. [ ] Daily advice v1 (Converse), `CoachAdvice` table, advice card
+6. [ ] Module C runbook, chat Lambda and Coach tab on Bedrock Agents
+7. [ ] Module G runbook, AgentCore chat backend and switch
+8. [ ] RideWithGPS routes, ride weather (Open-Meteo), calculator MCP server
+9. [ ] Modules D, E, F; move daily advice to v2 and v3
+
+### Decisions and parked items
+
+- [ ] Delete the three older Knowledge Bases (`coach-kb-fixed`, `-semantic`,
+      `-hierarchical`) once semantic-v2 is confirmed. Don't re-sync them: their
+      `library/` source no longer contains the tables.
+- [ ] Direct Garmin access (`python-garminconnect`) only for gaps Intervals can't
+      fill, such as Body Battery or stress
+- Covered through other sources, no work: Rouvy and Zwift (via Strava), Komoot
+  (via Garmin or RideWithGPS), TrainingPeaks (replaced by Intervals). Zwift events
+  are out of scope.
+- Dropped: Google Fit (REST API deprecated; Health Connect is on-device only).
