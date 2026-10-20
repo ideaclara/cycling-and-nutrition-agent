@@ -77,8 +77,18 @@ def slugify(text: str) -> str:
 
 
 LATEX_SYMBOLS = {
-    "approx": "≈", "times": "×", "ge": "≥", "geq": "≥", "le": "≤", "leq": "≤",
-    "tau": "τ", "implies": "⇒", "rightarrow": "→", "to": "→", "pm": "±", "cdot": "·",
+    "approx": "≈",
+    "times": "×",
+    "ge": "≥",
+    "geq": "≥",
+    "le": "≤",
+    "leq": "≤",
+    "tau": "τ",
+    "implies": "⇒",
+    "rightarrow": "→",
+    "to": "→",
+    "pm": "±",
+    "cdot": "·",
 }
 
 
@@ -130,7 +140,7 @@ def clean_friel(raw: str) -> str:
     """The file is a Python snippet: content = \"\"\"<escaped markdown>\"\"\" plus a changelog."""
     match = re.search(r'content \\?= """(.*?)\n"""', raw, re.DOTALL)
     if not match:
-        raise ValueError("Friel: expected content = \"\"\" ... \"\"\" wrapper")
+        raise ValueError('Friel: expected content = """ ... """ wrapper')
     body = re.sub(r"\\([\\`*_{}\[\]()#+\-.!=<>|~$])", r"\1", match.group(1))
     body = body.replace("\\\\", "\\")  # the ASCII diagrams were double-escaped
     body = re.sub(r"\s*for Gemini Gem Knowledge Base", "", body)
