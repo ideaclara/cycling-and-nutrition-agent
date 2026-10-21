@@ -75,4 +75,16 @@ export const postReading = (reading: Record<string, unknown>) =>
   request<Reading>('/readings', { method: 'POST', body: JSON.stringify(reading) });
 export const deleteReading = (type: ReadingType, measuredAt: string) =>
   request<{ deleted: string }>(`/readings/${type}/${encodeURIComponent(measuredAt)}`, { method: 'DELETE' });
+export interface Advice {
+  date: string;
+  status: 'green' | 'amber' | 'red' | 'unknown';
+  text: string;
+  generated_at: string;
+  model: string;
+  guardrail_intervened?: boolean;
+  facts: { flags: string[]; missing: string[] } & Record<string, unknown>;
+}
+
+export const getLatestAdvice = () => request<Advice>('/advice/latest');
+export const refreshAdvice = () => request<Advice>('/advice/refresh', { method: 'POST' });
 export const syncStrava = () => request<{ message: string; queued: number }>('/strava/sync', { method: 'POST' });

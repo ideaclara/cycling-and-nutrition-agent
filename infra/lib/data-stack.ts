@@ -21,6 +21,7 @@ export class DataStack extends Stack {
   readonly withingsTelemetry: dynamodb.Table;
   readonly manualReadings: dynamodb.Table;
   readonly intervalsDaily: dynamodb.Table;
+  readonly coachAdvice: dynamodb.Table;
   readonly dataBucket: s3.Bucket;
   readonly kbSourceBucket: s3.Bucket;
   readonly evalBucket: s3.Bucket;
@@ -71,6 +72,14 @@ export class DataStack extends Stack {
     this.intervalsDaily = new dynamodb.Table(this, 'IntervalsDaily', {
       ...tableDefaults,
       tableName: 'IntervalsDaily',
+      partitionKey: { name: 'athleteId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'date', type: dynamodb.AttributeType.STRING },
+    });
+
+    // Daily advice, one item per day (SK = YYYY-MM-DD), with the facts it was based on.
+    this.coachAdvice = new dynamodb.Table(this, 'CoachAdvice', {
+      ...tableDefaults,
+      tableName: 'CoachAdvice',
       partitionKey: { name: 'athleteId', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'date', type: dynamodb.AttributeType.STRING },
     });

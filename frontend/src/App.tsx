@@ -1,6 +1,7 @@
 import { Authenticator } from '@aws-amplify/ui-react';
 import '@aws-amplify/ui-react/styles.css';
 import { useEffect, useState } from 'react';
+import { AdviceCard } from './AdviceCard';
 import { type Schema, getSchema, syncIntervals, syncStrava } from './api';
 import { DailyLogForm } from './DailyLogForm';
 
@@ -44,6 +45,7 @@ function LoggedIn({ signOut }: { signOut?: () => void }) {
           </button>
         </div>
       </header>
+      <AdviceCard />
       {error && <p className="error">Could not load the form: {error}</p>}
       {schema ? <DailyLogForm schema={schema} /> : !error && <p className="muted">Loading…</p>}
     </main>

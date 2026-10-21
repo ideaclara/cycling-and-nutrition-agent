@@ -22,6 +22,12 @@ const ctx = (key: string): string => {
   return value;
 };
 
+// Set after Module B: -c guardrailId=<id> -c guardrailVersion=1 (or in cdk.json).
+function optionalGuardrail(): { id: string; version: string } | undefined {
+  const id = app.node.tryGetContext('guardrailId');
+  return typeof id === 'string' && id ? { id, version: String(app.node.tryGetContext('guardrailVersion') ?? '1') } : undefined;
+}
+
 // Everything lives in the region named in config/models.json (us-east-1).
 const env = { account: process.env.CDK_DEFAULT_ACCOUNT, region: models.region as string };
 const projectTag = { key: 'project', value: 'cycling-coach' };
@@ -69,6 +75,9 @@ new CoachApiStack(app, 'CoachApi', {
   withingsTable: data.withingsTelemetry,
   readingsTable: data.manualReadings,
   intervalsTable: data.intervalsDaily,
+  adviceTable: data.coachAdvice,
+  adviceModelId: models.roles.flow.modelId as string,
+  guardrail: optionalGuardrail(),
   httpApi: api.httpApi,
   authorizer: api.authorizer,
 });

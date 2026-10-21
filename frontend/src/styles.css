@@ -174,3 +174,49 @@ ul.readings li {
   padding: 6px 0;
   border-top: 1px solid var(--border);
 }
+
+.advice {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--muted);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+.advice-green {
+  border-left-color: var(--ok);
+}
+
+.advice-amber {
+  border-left-color: #d29922;
+}
+
+.advice-red {
+  border-left-color: var(--error);
+}
+
+.advice-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.advice h2 {
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.badge {
+  font-size: 0.75rem;
+  font-weight: 500;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.small {
+  font-size: 0.8rem;
+}
