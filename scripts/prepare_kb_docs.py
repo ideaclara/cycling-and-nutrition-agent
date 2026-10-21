@@ -11,6 +11,10 @@ Reads SOURCE (never modifies it) and rebuilds bedrock/kb-docs/{library,tables,pa
       nutrition/racing-weight/chapter-04-improving-your-diet-quality/table-4-1-how-to-score-your-diet-quality-dqs.md
     papers/    PDFs for the foundation-model parser, reference lists removed
       nutrition/ioc-reds-2023.pdf
+      eating_behaviour/<paper>.pdf
+
+eating_behaviour/ holds your own strategy documents exported from Google Docs as
+Markdown (library/eating_behaviour/) and any open-access papers as PDFs.
 
 Every document gets a `<file>.metadata.json` sidecar with `domain`, `source_type`
 `title` and `content_type` (`text` or `table`), plus `year`, `chapter`, `section`,
@@ -55,6 +59,11 @@ XERT_SKIP_SECTIONS = {
     "Troubleshooting > Syncing & Activities",
     "Using Xert > Xert On Your Bike Computer",
 }
+EATING_BEHAVIOUR = "eating_behaviour"
+# Sections of a strategy document that are about building the knowledge base
+# itself, not about eating behaviour: indexing them would surface RAG advice in
+# coaching answers.
+EATING_SKIP_SECTIONS = ("Part 2", "Interactive Architecture")
 PAPERS = {
     "nutrition/2023 IOC Consensus Statement on Relative Energy Deficiency in Sport.pdf": (
         "nutrition/ioc-reds-2023.pdf",
@@ -289,6 +298,45 @@ def racing_weight_doc(name: str, raw: str) -> tuple[str, str, dict]:
     return rel, tidy(body), metadata
 
 
+# --- Eating behaviour (Google Docs Markdown export) ----------------------------
+
+
+def clean_google_markdown(raw: str) -> str:
+    """Undo Google Docs' export quirks: escaped punctuation, bold headings, <br> in cells, images."""
+    text = re.sub(r"\\([+\-.~()!#=\[\]])", r"\1", raw)
+    text = re.sub(r"^(#+)\s+\*\*(.+?)\*\*\s*$", r"\1 \2", text, flags=re.MULTILINE)
+    text = re.sub(r"\s*<br\s*/?>\s*", "; ", text)
+    return re.sub(r"!\[[^\]]*\]\([^)]*\)", "", text)
+
+
+def drop_sections(markdown: str, prefixes: tuple[str, ...]) -> tuple[str, list[str]]:
+    """Remove each section whose heading starts with one of `prefixes`, up to the next heading at its level or above."""
+    out: list[str] = []
+    dropped: list[str] = []
+    skipping_level = 0
+    for line in markdown.splitlines():
+        heading = re.match(r"^(#+)\s+(.*)", line)
+        if heading:
+            level, title = len(heading.group(1)), _plain(heading.group(2))
+            if skipping_level and level <= skipping_level:
+                skipping_level = 0
+            if not skipping_level and title.startswith(prefixes):
+                skipping_level = level
+                dropped.append(title)
+        if not skipping_level:
+            out.append(line)
+    return "\n".join(out), dropped
+
+
+def eating_behaviour_doc(name: str, raw: str) -> tuple[str, str, dict, list[str]]:
+    title = Path(name).stem
+    body, dropped = drop_sections(clean_google_markdown(raw), EATING_SKIP_SECTIONS)
+    if not re.match(r"\s*# ", body):
+        body = f"# {title}\n\n{body.lstrip()}"
+    metadata = {"domain": "eating_behaviour", "source_type": "strategy", "title": title}
+    return f"library/eating_behaviour/{slugify(title)}.md", tidy(body), metadata, dropped
+
+
 # --- Xert ------------------------------------------------------------------------
 
 
@@ -402,6 +450,21 @@ def main():
         metadata = {"domain": "nutrition", "source_type": "consensus", **extra}
         write(f"papers/{rel_out}", buffer.getvalue(), metadata, report)
         report.append(("trimmed", rel_out, f"kept {kept} of {len(reader.pages)} pages"))
+
+    eating = src / EATING_BEHAVIOUR
+    for path in sorted(eating.glob("*.md")) if eating.is_dir() else []:
+        rel, text, metadata, dropped = eating_behaviour_doc(path.name, path.read_text(encoding="utf-8"))
+        write(rel, text, metadata, report)
+        for title in dropped:
+            report.append(("dropped", title[:70], f"section of {path.name} about building the KB"))
+    for path in sorted(eating.glob("*.pdf")) if eating.is_dir() else []:
+        reader = PdfReader(path)
+        writer, kept = trim_references(reader)
+        buffer = io.BytesIO()
+        writer.write(buffer)
+        metadata = {"domain": "eating_behaviour", "source_type": "paper", "title": path.stem[:120]}
+        write(f"papers/eating_behaviour/{slugify(path.stem)}.pdf", buffer.getvalue(), metadata, report)
+        report.append(("trimmed", path.name[:70], f"kept {kept} of {len(reader.pages)} pages"))
 
     for action, name, detail in report:
         print(f"{action:8} {name:<75} {detail}")

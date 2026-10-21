@@ -125,3 +125,28 @@ def test_tidy_turns_inline_latex_into_text_but_leaves_currency():
     assert kb.tidy("BMI $18.5–24.9$ and $>10\\%$ fat") == "BMI 18.5–24.9 and >10% fat\n"
     assert kb.tidy("$$W = \\frac{LBM}{0.88}$$") == "W = (LBM) / (0.88)\n"
     assert kb.tidy("costs upward of $10,000 per unit") == "costs upward of $10,000 per unit\n"
+
+
+GOOGLE_DOC = (
+    "Intro with fat \\+ sugar and 2016 \\- trial.\n\n"
+    "## **Part 1: Strategies**\n\n### **Layer 1: Food**\n\nEat slowly.![chart](x.png)\n\n"
+    "| Tool | Protocol |\n| :---- | :---- |\n| **If-Then** | Brew tea<br>wait 15 min |\n\n"
+    "## **Part 2: Building a RAG corpus**\n\n### Tier 1\n\nRAG Utility: ignore.\n\n"
+    "## **Interactive Architecture: Simulator**\n\nUse the simulator.\n"
+)
+
+
+def test_eating_behaviour_doc_cleans_google_export_and_drops_kb_sections():
+    rel, text, metadata, dropped = kb.eating_behaviour_doc("Avoiding Binge-Eating.md", GOOGLE_DOC)
+    assert rel == "library/eating_behaviour/avoiding-binge-eating.md"
+    assert text.startswith("# Avoiding Binge-Eating\n\nIntro with fat + sugar and 2016 - trial.")
+    assert "## Part 1: Strategies" in text and "### Layer 1: Food" in text
+    assert "| **If-Then** | Brew tea; wait 15 min |" in text
+    for gone in ("x.png", "RAG", "simulator", "Tier 1"):
+        assert gone not in text
+    assert dropped == ["Part 2: Building a RAG corpus", "Interactive Architecture: Simulator"]
+    assert metadata == {"domain": "eating_behaviour", "source_type": "strategy", "title": "Avoiding Binge-Eating"}
+
+    _, tables = kb.extract_tables(text)
+    assert tables[0].caption == "Layer 1: Food"
+    assert tables[0].rows == [["If-Then", "Brew tea; wait 15 min"]]

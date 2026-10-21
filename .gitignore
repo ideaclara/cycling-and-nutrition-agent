@@ -43,6 +43,7 @@ coverage/
 # sidecars and the Module A runbook stay local (and in the private S3 bucket).
 bedrock/kb-docs/
 documentation/labs/A-knowledge-base.md
+documentation/kb-eating-behaviour-review.md
 
 # Local reference output (e.g. `aws bedrock list-inference-profiles`)
 documentation/inference-profiles-us-east-1.txt
