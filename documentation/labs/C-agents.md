@@ -99,7 +99,7 @@ With nobody chatting, every one of these is zero.
 | Description | Cycling and nutrition coach | |
 | Multi-agent collaboration | Off | Optional extension at the end |
 | Agent resource role | **Create and use a new service role** | You'll inspect what the console grants |
-| Model | The `agent` model in `config/models.json`: Claude Haiku 5.5 through the **global cross-region inference profile** | Inference profiles route to capacity in other regions. Note the extra permissions this needs in step 7. |
+| Model | The `agent` model in `config/models.json`: Claude Haiku 4.5 through the **global cross-region inference profile** | Inference profiles route to capacity in other regions. Note the extra permissions this needs in step 7. |
 | Idle session timeout | 600 seconds | How long the agent remembers a conversation without activity |
 | User input | Enabled | Lets the agent ask you a clarifying question instead of guessing |
 | Code interpreter | Off | Not needed, and it adds cost |
@@ -237,7 +237,7 @@ Create two collaborator agents, `fueling-coach` (KB plus `dqs`) and `workout-coa
 
 | Item | Rough cost |
 |---|---|
-| One chat turn with Haiku 5.5: 2–4 model steps of a few thousand tokens each | About $0.005–0.02 |
+| One chat turn with Haiku 4.5: 2–4 model steps of a few thousand tokens each | About $0.01–0.05 |
 | KB retrieval, guardrail and Lambda per turn | Fractions of a cent |
 | Standing cost when idle | **$0** |
 

@@ -10,8 +10,8 @@ Open **Amazon Bedrock → Model catalog** in **us-east-1**.
 
 | Profile | Example | Where requests may run |
 |---|---|---|
-| Geographic | `us.anthropic.claude-haiku-5-5` | Any Region in that geography (US) |
-| Global | `global.anthropic.claude-haiku-5-5` | Any commercial AWS Region worldwide |
+| Geographic | `us.anthropic.claude-haiku-4-5-20251001-v1:0` | Any Region in that geography (US) |
+| Global | `global.anthropic.claude-haiku-4-5-20251001-v1:0` | Any commercial AWS Region worldwide |
 
 Either way you *call* the profile from your source Region (us-east-1), and Bedrock picks where to run it. Global gives the most capacity headroom and is typically priced a little below geographic, so check the pricing page. Choose geographic only if data residency matters. This project has no residency requirement, so it **defaults to global, with the `us.` profile of the same model as the fallback**. Use the fallback for any console feature that doesn't list global profiles.
 
@@ -21,11 +21,13 @@ For each role in `config/models.json`, find the model and copy the exact ID or i
 
 | Role | Model | Where it's used |
 |---|---|---|
-| `agent` | Claude Haiku 5.5 (`global.`). The `fallback` is the `us.` profile | Coach agent (Module C) |
-| `flow` | Claude Haiku 5.5 (`global.`) | Prompt node in the Flow (Module D) |
+| `agent` | Claude Haiku 4.5 (`global.`). The `fallback` is the `us.` profile | Coach agent (Module C) |
+| `flow` | Claude Haiku 4.5 (`global.`) | Prompt node in the Flow (Module D) |
 | `compare` | Amazon Nova Lite and Amazon Nova Pro | Prompt comparisons (Module E) |
-| `judge` | Claude Sonnet 5.5 (`global.`) | LLM-as-a-judge evaluation (Module F) |
+| `judge` | Claude Sonnet 4.5 (`global.`) | LLM-as-a-judge evaluation (Module F) |
 | `embeddings` | Titan Text Embeddings v2, 1024 dimensions | Knowledge Base (Module A) |
+
+The Claude roles use the 4.5 models until this account has an agreement for the 5.5 models (Bedrock reports them as "not available for this account" until then). Haiku 5.5 is a tenth of Haiku 4.5's per-token price, so switch back once access is in place: `aws bedrock get-foundation-model-availability --model-id anthropic.claude-haiku-5-5` shows `agreementAvailability: AVAILABLE` when it is.
 
 To list the profiles from the CLI:
 

@@ -66,8 +66,10 @@ through it one milestone per Claude session.
        - [x] `GET /analysis/series` (deployed)
        - [ ] design discussion, then charts
 5. [~] Daily advice v1 (Converse), `CoachAdvice` table, advice card, 07:30 schedule (deployed)
-       - [ ] **Blocked:** Claude 5.5 models return "not available for this account" (Haiku 4.5,
-             Sonnet 4.5 and Nova work). Request access, or switch `flow`/`agent` to Haiku 4.5.
+       - [x] switched `agent`/`flow` to Haiku 4.5 and `judge` to Sonnet 4.5: the 5.5 models
+             return "not available for this account" (no Marketplace agreement yet)
+       - [ ] **Matt:** accept the 5.5 agreement (console playground, or
+             `create-foundation-model-agreement`), then switch `config/models.json` back
 6. [~] Module C runbook, chat Lambda and Coach tab on Bedrock Agents
        - [x] chat Lambda (both backends, 503 until configured) and Coach tab
        - [x] Module C runbook (`documentation/labs/C-agents.md`)

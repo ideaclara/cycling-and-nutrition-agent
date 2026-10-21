@@ -3,12 +3,12 @@
   "region": "us-east-1",
   "roles": {
     "agent": {
-      "modelId": "global.anthropic.claude-haiku-5-5",
-      "fallback": "us.anthropic.claude-haiku-5-5"
+      "modelId": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+      "fallback": "us.anthropic.claude-haiku-4-5-20251001-v1:0"
     },
     "flow": {
-      "modelId": "global.anthropic.claude-haiku-5-5",
-      "fallback": "us.anthropic.claude-haiku-5-5"
+      "modelId": "global.anthropic.claude-haiku-4-5-20251001-v1:0",
+      "fallback": "us.anthropic.claude-haiku-4-5-20251001-v1:0"
     },
     "compare": [
       {
@@ -19,8 +19,8 @@
       }
     ],
     "judge": {
-      "modelId": "global.anthropic.claude-sonnet-5-5",
-      "fallback": "us.anthropic.claude-sonnet-5-5"
+      "modelId": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+      "fallback": "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
     },
     "embeddings": {
       "modelId": "amazon.titan-embed-text-v2:0",

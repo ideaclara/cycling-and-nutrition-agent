@@ -68,7 +68,7 @@ def test_no_data_is_unknown(aws):
 def test_refresh_stores_advice_and_latest_returns_it(week, monkeypatch):
     from coach.advice import handler
 
-    monkeypatch.setenv("ADVICE_MODEL_ID", "global.anthropic.claude-haiku-5-5")
+    monkeypatch.setenv("ADVICE_MODEL_ID", "global.anthropic.claude-haiku-4-5-20251001-v1:0")
     monkeypatch.setenv("GUARDRAIL_ID", "gr-123")
     monkeypatch.setattr(handler, "today", lambda: date(2026, 10, 19))
     sent = {}
