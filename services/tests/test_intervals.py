@@ -31,6 +31,29 @@ WELLNESS = [
     },
 ]
 
+ACTIVITIES = [
+    {
+        "id": "i101",
+        "start_date_local": "2026-10-18T09:10:00",
+        "type": "Ride",
+        "name": "Morning ride",
+        "moving_time": 7200,
+        "icu_training_load": 120,
+        "icu_intensity": 77.46,
+        "icu_weighted_avg_watts": 217,
+        "icu_average_watts": 201,
+        "icu_ftp": 281,
+        "icu_joules": 1447200,
+        "icu_zone_times": [{"id": "Z1", "secs": 600}, {"id": "Z2", "secs": 4800}],
+        "feel": None,
+    },
+    {
+        "id": "i102",
+        "start_date_local": "2026-10-19T08:00:00",
+        "_note": "STRAVA activities are not available via the API",
+    },
+]
+
 
 @pytest.fixture
 def intervals(aws, monkeypatch):
@@ -41,6 +64,8 @@ def intervals(aws, monkeypatch):
 
     def fake_get(path, creds, params=None):
         calls.append((path, params))
+        if path.endswith("/activities"):
+            return [a for a in ACTIVITIES if params["oldest"] <= a["start_date_local"][:10] <= params["newest"]]
         return [r for r in WELLNESS if params["oldest"] <= r["id"] <= params["newest"]]
 
     from common import intervals_api
@@ -61,12 +86,18 @@ def test_backfill_then_repeat_writes_nothing(intervals, monkeypatch):
 
     monkeypatch.setattr(handler, "today", lambda: __import__("datetime").date(2026, 10, 19))
     first = run({})
-    assert first == {"oldest": "2026-10-01", "newest": "2026-10-19", "fetched": 2, "written": 2}
+    assert first == {
+        "oldest": "2026-10-01",
+        "newest": "2026-10-19",
+        "wellness": {"fetched": 2, "written": 2},
+        "activities": {"fetched": 2, "written": 1, "skipped_strava_stubs": 1},
+    }
     assert intervals[0] == ("/athlete/i42/wellness", {"oldest": "2026-10-01", "newest": "2026-10-19"})
+    assert intervals[1] == ("/athlete/i42/activities", {"oldest": "2026-10-01", "newest": "2026-10-19"})
 
     second = run({})
-    assert second["oldest"] == "2026-10-12"  # lookback once the table has data
-    assert second["written"] == 0
+    assert second["oldest"] == "2026-10-12"  # lookback once the tables have data
+    assert second["wellness"]["written"] == 0 and second["activities"]["written"] == 0
 
     item = (
         boto3.resource("dynamodb")
@@ -81,7 +112,7 @@ def test_changed_day_is_rewritten(intervals):
     run({"oldest": "2026-10-18", "newest": "2026-10-19"})
     WELLNESS[1]["hrv"] = 63.0
     try:
-        assert run({"oldest": "2026-10-18", "newest": "2026-10-19"})["written"] == 1
+        assert run({"oldest": "2026-10-18", "newest": "2026-10-19"})["wellness"]["written"] == 1
     finally:
         WELLNESS[1]["hrv"] = 61.0
 
@@ -102,11 +133,47 @@ def test_daily_fields_mapping():
         "resting_hr_bpm": 45,
         "sleep_duration_h": 8.3,
         "sleep_score": 88,
-        "tp_ctl": 62.0,
-        "tp_atl": 66.8,
-        "tp_tsb": -4.8,
     }
     assert as_daily_fields(None) == {}
+
+
+def test_load_fields_prefer_intervals_then_legacy_log():
+    from common.intervals_repo import load_fields
+
+    assert load_fields(WELLNESS[1], {"tp_ctl": 50}) == {"ctl": 62.0, "atl": 66.8, "tsb": -4.8}
+    assert load_fields(None, {"tp_ctl": 50, "tp_atl": 55, "tp_tss": 80}) == {"ctl": 50, "atl": 55}
+    assert load_fields(None, None) == {}
+
+
+def test_activity_is_stored_whole_and_summarised(intervals):
+    from common import intervals_repo
+
+    run({"oldest": "2026-10-18", "newest": "2026-10-19"})
+    item = (
+        boto3.resource("dynamodb")
+        .Table("IntervalsActivities")
+        .get_item(Key={"athleteId": "3634905", "sk": "2026-10-18T09:10:00#i101"})["Item"]
+    )
+    assert item["date"] == "2026-10-18" and "feel" not in item
+    assert item["icu_zone_times"][1] == {"id": "Z2", "secs": 4800}
+
+    [summary] = [
+        intervals_repo.activity_summary(a)
+        for a in intervals_repo.activities_range("3634905", "2026-10-18", "2026-10-19")
+    ]
+    assert summary == {
+        "id": "i101",
+        "name": "Morning ride",
+        "type": "Ride",
+        "start_date_local": "2026-10-18T09:10:00",
+        "moving_time_s": 7200,
+        "tss": 120,
+        "intensity_factor": 0.77,
+        "normalized_power_w": 217,
+        "average_power_w": 201,
+        "ftp_w": 281,
+        "kilojoules": 1447,
+    }
 
 
 def test_requests_send_a_user_agent(monkeypatch):

@@ -10,6 +10,7 @@ from and choose which one wins:
      "intervals": {...Intervals.icu wellness and fitness...},
      "withings": {...last scale session that day...},
      "strava": {"activities": 1, "moving_time_s": 7200, "distance_m": 60000, "kilojoules": 1500, ...},
+     "rides": {"tss": 120, "rides": [{"tss": 120, "intensity_factor": 0.77, "normalized_power_w": 217, ...}]},
      "bp": [{"time": "07:00", "systolic_mmhg": 118, ...}], "temp": [{"time": "07:05", "temp_c": 36.7}]}
 
 Days with no data at all are still returned, so charts get a continuous x-axis.
@@ -75,6 +76,10 @@ def series(start: date, end: date) -> list[dict]:
         by_day.setdefault(str(activity["start_date_local"])[:10], []).append(activity)
     for day, activities in by_day.items():
         rows[day]["strava"] = _strava_day(activities)
+    for activity in intervals_repo.activities_range(athlete, lo, hi):
+        day = rows[activity["start_date_local"][:10]].setdefault("rides", {"tss": 0, "rides": []})
+        day["tss"] += activity.get("icu_training_load") or 0
+        day["rides"].append(intervals_repo.activity_summary(activity))
     for reading in readings_repo.query(athlete, start, end):
         key = "bp" if reading["type"] == "BP" else "temp"
         values = {k: v for k, v in reading.items() if k.endswith(("_mmhg", "_bpm", "_c"))}

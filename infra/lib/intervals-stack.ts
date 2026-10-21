@@ -11,6 +11,7 @@ import { PythonFunction } from './python-function';
 export interface IntervalsStackProps extends StackProps {
   readonly athleteId: string;
   readonly intervalsTable: dynamodb.ITable;
+  readonly activitiesTable: dynamodb.ITable;
   readonly httpApi: apigw.HttpApi;
   readonly authorizer: apigw.IHttpRouteAuthorizer;
   /** First day fetched when the table is empty (YYYY-MM-DD). */
@@ -19,7 +20,7 @@ export interface IntervalsStackProps extends StackProps {
 
 /**
  * Intervals.icu ingestion:
- *   EventBridge (6h) / POST /intervals/sync -> intervals-sync -> IntervalsDaily
+ *   EventBridge (6h) / POST /intervals/sync -> intervals-sync -> IntervalsDaily + IntervalsActivities
  *
  * The API key lives in a secret created by hand (documentation/labs/03-intervals.md).
  * Until it exists the sync logs a warning and does nothing.
@@ -33,19 +34,21 @@ export class IntervalsStack extends Stack {
     const syncFn = new PythonFunction(this, 'Sync', {
       functionName: 'intervals-sync',
       handlerModule: 'intervals/sync/handler',
-      description: 'Copies Intervals.icu daily wellness and fitness records into IntervalsDaily',
+      description: 'Copies Intervals.icu wellness into IntervalsDaily and activities into IntervalsActivities',
       timeout: Duration.seconds(120),
       environment: {
         ATHLETE_ID: props.athleteId,
         ATHLETE_TIMEZONE: 'Europe/London',
         INTERVALS_SECRET_ID: secret.secretName,
         INTERVALS_TABLE: props.intervalsTable.tableName,
+        INTERVALS_ACTIVITIES_TABLE: props.activitiesTable.tableName,
         BACKFILL_START_DATE: props.backfillStartDate,
       },
       reservedConcurrentExecutions: 1,
     });
     secret.grantRead(syncFn);
     props.intervalsTable.grantReadWriteData(syncFn);
+    props.activitiesTable.grantReadWriteData(syncFn);
 
     new events.Rule(this, 'SyncSchedule', {
       ruleName: 'intervals-sync-every-6h',

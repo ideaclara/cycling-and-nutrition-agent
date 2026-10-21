@@ -38,6 +38,35 @@ def test_features_compute_baselines_flags_and_levels(week):
     assert facts["missing"] == []
 
 
+def test_intervals_rides_give_tss_and_ftp_without_xert(week):
+    from coach.advice import features
+
+    week.Table("DailyFitnessLog").delete_item(Key={"athleteId": "3634905", "date": "2026-10-19"})
+    rides = week.Table("IntervalsActivities")
+    for sk, load in (("2026-10-18T08:00:00#i1", 90), ("2026-10-18T17:00:00#i2", 30), ("2026-10-17T08:00:00#i0", 50)):
+        rides.put_item(
+            Item={
+                "athleteId": "3634905",
+                "sk": sk,
+                "start_date_local": sk[:19],
+                "icu_training_load": load,
+                "icu_ftp": 280,
+            }
+        )
+    facts = features.build("3634905", date(2026, 10, 19))
+    assert facts["yesterday"]["tss"] == 120
+    assert facts["threshold_power_w"] == 280
+
+
+def test_legacy_trainingpeaks_load_is_used_before_intervals(aws):
+    from coach.advice import features
+
+    put_days(
+        boto3.resource("dynamodb").Table("DailyFitnessLog"), {"2026-03-01": {"tp_ctl": 50, "tp_atl": 40, "tp_tsb": 10}}
+    )
+    assert features.build("3634905", date(2026, 3, 1))["load"]["tsb"] == 10
+
+
 def test_fever_reading_makes_status_red(week):
     from coach.advice import features
 

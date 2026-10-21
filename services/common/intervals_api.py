@@ -71,3 +71,12 @@ def get(path: str, creds: Credentials, params: dict | None = None):
 def wellness(creds: Credentials, oldest: str, newest: str) -> list[dict]:
     """One record per day (``id`` = YYYY-MM-DD) with wellness and fitness/fatigue values."""
     return get(f"/athlete/{creds.athlete_id}/wellness", creds, {"oldest": oldest, "newest": newest})
+
+
+def activities(creds: Credentials, oldest: str, newest: str) -> list[dict]:
+    """Activities started between the two local dates, with every metric Intervals calculates.
+
+    Activities that reached Intervals only through Strava come back as stubs
+    (``_note``: "STRAVA activities are not available via the API").
+    """
+    return get(f"/athlete/{creds.athlete_id}/activities", creds, {"oldest": oldest, "newest": newest})

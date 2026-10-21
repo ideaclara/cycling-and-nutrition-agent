@@ -46,6 +46,17 @@ def test_series_merges_every_source_per_day(aws):
         }
     )
 
+    ddb.Table("IntervalsActivities").put_item(
+        Item={
+            "athleteId": "3634905",
+            "sk": "2026-10-19T07:00:00#i9",
+            "start_date_local": "2026-10-19T07:00:00",
+            "icu_training_load": 95,
+            "icu_intensity": Decimal("81.2"),
+            "icu_weighted_avg_watts": 228,
+        }
+    )
+
     status, body = call({"from": "2026-10-17", "to": "2026-10-19"})
     assert status == 200
     days = {d["date"]: d for d in body["days"]}
@@ -57,6 +68,17 @@ def test_series_merges_every_source_per_day(aws):
     assert days["2026-10-19"]["strava"]["activities"] == 2
     assert days["2026-10-19"]["strava"]["kilojoules"] == 1500
     assert days["2026-10-19"]["temp"] == [{"time": "07:05", "temp_c": 36.7}]
+    assert days["2026-10-19"]["rides"] == {
+        "tss": 95,
+        "rides": [
+            {
+                "start_date_local": "2026-10-19T07:00:00",
+                "tss": 95,
+                "intensity_factor": 0.81,
+                "normalized_power_w": 228,
+            }
+        ],
+    }
 
 
 def test_range_limits(aws):

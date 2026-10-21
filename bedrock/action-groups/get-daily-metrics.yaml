@@ -4,9 +4,10 @@ info:
   version: 1.0.0
   description: >-
     Read the athlete's consolidated data for one calendar day: the manual daily log
-    (Garmin recovery, Xert fitness signature, TrainingPeaks load, Diet Quality Score,
-    waist measurement), the Intervals.icu wellness and fitness record, blood pressure
-    and temperature readings, the latest Withings scale reading, and that day's Strava rides.
+    (Garmin recovery, Xert fitness signature, Diet Quality Score, waist measurement),
+    the Intervals.icu wellness and fitness record, that day's rides from Intervals.icu
+    (TSS, IF, normalized power), blood pressure and temperature readings, the latest
+    Withings scale reading, and that day's Strava rides.
 paths:
   /daily-metrics:
     get:
@@ -38,7 +39,8 @@ paths:
                     type: object
                     description: >-
                       Manual log fields, e.g. hrv_overnight_avg_ms, resting_hr_bpm, sleep_score,
-                      training_readiness, xert_tp_w, tp_ctl, tp_atl, tp_tsb, dqs_total, waist_cm.
+                      training_readiness, xert_tp_w, dqs_total, waist_cm. Days before Intervals.icu
+                      may also have tp_ctl, tp_atl, tp_tsb, tp_tss and tp_if typed in from TrainingPeaks.
                   daily_log_missing:
                     type: boolean
                   intervals:
@@ -57,6 +59,15 @@ paths:
                   withings_latest:
                     type: object
                     description: Most recent scale session on or before the day (weight_kg, fat_ratio_pct, ...).
+                  intervals_activities:
+                    type: array
+                    description: >-
+                      Rides started that day as analysed by Intervals.icu: tss, intensity_factor,
+                      normalized_power_w, average_power_w, ftp_w (the FTP used for TSS and IF),
+                      variability_index, efficiency_factor, decoupling_pct, kilojoules, carbs_used_g,
+                      average_hr_bpm, hr_load, rpe, feel, moving_time_s, distance_m, elevation_m.
+                    items:
+                      type: object
                   strava_activities:
                     type: array
                     description: >-

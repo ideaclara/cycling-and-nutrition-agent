@@ -6,6 +6,7 @@ advice and the analysis API.
 - ManualReadings: blood pressure and temperature (timestamped)
 - WithingsTelemetry: scale sessions (timestamped)
 - StravaActivities: activities (summaries only, never the raw payload)
+- IntervalsActivities: per-ride TSS, IF, normalized power and the other Intervals metrics
 """
 
 import os
@@ -146,4 +147,8 @@ def day_snapshot(day: date) -> dict:
         "readings": readings_repo.query(_athlete_id(), day, day) if os.environ.get("READINGS_TABLE") else [],
         "withings_latest": latest_withings(day),
         "strava_activities": activities_on(day),
+        "intervals_activities": [
+            intervals_repo.activity_summary(a)
+            for a in intervals_repo.activities_range(_athlete_id(), day.isoformat(), day.isoformat())
+        ],
     }

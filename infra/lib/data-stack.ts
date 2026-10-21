@@ -21,6 +21,7 @@ export class DataStack extends Stack {
   readonly withingsTelemetry: dynamodb.Table;
   readonly manualReadings: dynamodb.Table;
   readonly intervalsDaily: dynamodb.Table;
+  readonly intervalsActivities: dynamodb.Table;
   readonly coachAdvice: dynamodb.Table;
   readonly chatMessages: dynamodb.Table;
   readonly dataBucket: s3.Bucket;
@@ -75,6 +76,15 @@ export class DataStack extends Stack {
       tableName: 'IntervalsDaily',
       partitionKey: { name: 'athleteId', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'date', type: dynamodb.AttributeType.STRING },
+    });
+
+    // Intervals.icu activities with every calculated metric (TSS, IF, NP, ...):
+    // SK = "<local start time>#<activity id>", so a day's rides sort together.
+    this.intervalsActivities = new dynamodb.Table(this, 'IntervalsActivities', {
+      ...tableDefaults,
+      tableName: 'IntervalsActivities',
+      partitionKey: { name: 'athleteId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'sk', type: dynamodb.AttributeType.STRING },
     });
 
     // Daily advice, one item per day (SK = YYYY-MM-DD), with the facts it was based on.

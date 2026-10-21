@@ -16,8 +16,12 @@ LOOKBACK_DAYS = 28
 
 
 def _merged(log: dict | None, intervals: dict | None) -> dict:
-    """Daily-log fields, filled from Intervals where the log has no value."""
-    return {**intervals_repo.as_daily_fields(intervals), **(log or {})}
+    """Daily-log fields, filled from Intervals where the log has no value, plus ctl/atl/tsb."""
+    return {
+        **intervals_repo.as_daily_fields(intervals),
+        **(log or {}),
+        **intervals_repo.load_fields(intervals, log),
+    }
 
 
 def _baseline(days: list[dict], field: str) -> float | None:
@@ -57,16 +61,23 @@ def build(athlete_id: str, day: date) -> dict:
 
     hrv, rhr = today.get("hrv_overnight_avg_ms"), today.get("resting_hr_bpm")
     hrv_base, rhr_base = _baseline(previous, "hrv_overnight_avg_ms"), _baseline(previous, "resting_hr_bpm")
-    ctl, atl = today.get("tp_ctl"), today.get("tp_atl")
-    tsb = today.get("tp_tsb", round(ctl - atl, 1) if ctl is not None and atl is not None else None)
-    ramp = round(ctl - week_ago["tp_ctl"], 1) if ctl is not None and week_ago.get("tp_ctl") is not None else None
+    ctl, atl = today.get("ctl"), today.get("atl")
+    tsb = today.get("tsb", round(ctl - atl, 1) if ctl is not None and atl is not None else None)
+    ramp = round(ctl - week_ago["ctl"], 1) if ctl is not None and week_ago.get("ctl") is not None else None
 
-    ftp = next(
-        (by_day[d]["xert_tp_w"] for d in sorted(by_day, reverse=True) if by_day[d].get("xert_tp_w")),
-        None,
-    )
     yesterday = day - timedelta(days=1)
     rides = metrics_repo.activities_on(yesterday)
+    recent_rides = intervals_repo.activities_range(athlete_id, start.isoformat(), day.isoformat())
+    # Threshold power: the latest Xert TP typed into the log, else the FTP Intervals used on the latest ride.
+    ftp = next(
+        (by_day[d]["xert_tp_w"] for d in sorted(by_day, reverse=True) if by_day[d].get("xert_tp_w")),
+        next((r["icu_ftp"] for r in reversed(recent_rides) if r.get("icu_ftp")), None),
+    )
+    tss = [
+        r["icu_training_load"]
+        for r in recent_rides
+        if r["start_date_local"][:10] == yesterday.isoformat() and r.get("icu_training_load") is not None
+    ]
     readings = readings_repo.query(athlete_id, day, day)
     bp = next((r for r in reversed(readings) if r["type"] == "BP"), None)
     temp = next((r for r in reversed(readings) if r["type"] == "TEMP"), None)
@@ -89,6 +100,7 @@ def build(athlete_id: str, day: date) -> dict:
             "rides": len(rides),
             "moving_time_h": round(sum(r.get("moving_time") or 0 for r in rides) / 3600, 2),
             "kilojoules": sum(r.get("kilojoules") or 0 for r in rides),
+            "tss": sum(tss) if tss else None,
             "dqs_total": (logs.get(yesterday.isoformat()) or {}).get("dqs_total"),
         },
         "threshold_power_w": ftp,

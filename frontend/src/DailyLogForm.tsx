@@ -6,7 +6,6 @@ import { changedValues, parseField, stepFor } from './validation';
 const GROUPS: { id: FieldDef['group']; title: string }[] = [
   { id: 'garmin', title: 'Garmin' },
   { id: 'xert', title: 'Xert' },
-  { id: 'trainingpeaks', title: 'TrainingPeaks' },
   { id: 'body', title: 'Body' },
 ];
 

@@ -15,6 +15,7 @@ os.environ.update(
     WITHINGS_TABLE="WithingsTelemetry",
     READINGS_TABLE="ManualReadings",
     INTERVALS_TABLE="IntervalsDaily",
+    INTERVALS_ACTIVITIES_TABLE="IntervalsActivities",
     INTERVALS_SECRET_ID="intervals/api",
     ADVICE_TABLE="CoachAdvice",
     CHAT_TABLE="ChatMessages",
@@ -49,6 +50,7 @@ def aws():
         _table(ddb, "WithingsTelemetry", "PK", "SK")
         _table(ddb, "ManualReadings", "athleteId", "sk")
         _table(ddb, "IntervalsDaily", "athleteId", "date")
+        _table(ddb, "IntervalsActivities", "athleteId", "sk")
         _table(ddb, "CoachAdvice", "athleteId", "date")
         _table(ddb, "ChatMessages", "sessionId", "ts")
         boto3.client("s3").create_bucket(Bucket="test-data-bucket")

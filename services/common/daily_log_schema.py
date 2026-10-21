@@ -35,12 +35,8 @@ FIELDS: dict[str, Field] = {
     "xert_low_xss": Field("Low XSS", "xert", 0, 1000),
     "xert_high_xss": Field("High XSS", "xert", 0, 1000),
     "xert_peak_xss": Field("Peak XSS", "xert", 0, 1000),
-    # TrainingPeaks
-    "tp_ctl": Field("Fitness (CTL)", "trainingpeaks", 0, 250, decimals=1),
-    "tp_atl": Field("Fatigue (ATL)", "trainingpeaks", 0, 300, decimals=1),
-    "tp_tsb": Field("Form (TSB)", "trainingpeaks", -150, 150, decimals=1),
-    "tp_tss": Field("TSS", "trainingpeaks", 0, 1000, decimals=1),
-    "tp_if": Field("Intensity Factor (IF)", "trainingpeaks", 0, 2, decimals=2),
+    # TrainingPeaks CTL/ATL/TSB/TSS/IF were removed: Intervals.icu supplies them
+    # (IntervalsDaily per day, IntervalsActivities per ride). Old values stay stored.
     # Body
     "waist_cm": Field("Waist", "body", 50, 150, unit="cm", decimals=1),
 }

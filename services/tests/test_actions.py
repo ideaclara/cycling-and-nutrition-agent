@@ -90,9 +90,9 @@ def test_ramp_rate_compute():
     from coach.actions.calculate_ramp_rate.handler import classify, compute
 
     rows = [
-        {"date": "2026-10-12", "tp_ctl": 60.0, "tp_atl": 65, "tp_tsb": -5},
-        {"date": "2026-10-15", "tp_ctl": 63.0},
-        {"date": "2026-10-19", "tp_ctl": 66.0, "tp_atl": 80, "tp_tsb": -14},
+        {"date": "2026-10-12", "ctl": 60.0, "atl": 65, "tsb": -5},
+        {"date": "2026-10-15", "ctl": 63.0},
+        {"date": "2026-10-19", "ctl": 66.0, "atl": 80, "tsb": -14},
     ]
     result = compute(rows, date(2026, 10, 12), date(2026, 10, 19))
     assert result["ramp_per_week"] == 6.0
@@ -104,8 +104,10 @@ def test_ramp_rate_compute():
 def test_ramp_rate_handler_uses_nearest_earlier_value(aws):
     from coach.actions.calculate_ramp_rate import handler
 
-    put_log("2026-10-10", tp_ctl=60.0)  # before the window start (2026-10-12)
-    put_log("2026-10-19", tp_ctl=62.0)
+    put_log("2026-10-10", tp_ctl=60.0)  # legacy TrainingPeaks value, before the window start (2026-10-12)
+    boto3.resource("dynamodb").Table("IntervalsDaily").put_item(
+        Item={"athleteId": "3634905", "date": "2026-10-19", "ctl": 62, "atl": 70}
+    )
     event = agent_event(
         "/ramp-rate",
         parameters=[

@@ -12,7 +12,7 @@ def call(event):
 
 def test_put_then_get_round_trips_waist(aws):
     status, item = call(
-        http_event("PUT /daily-log/{date}", {"date": "2026-10-19"}, body={"waist_cm": 84.5, "tp_ctl": 72.3})
+        http_event("PUT /daily-log/{date}", {"date": "2026-10-19"}, body={"waist_cm": 84.5, "xert_tp_w": 272})
     )
     assert status == 200
     assert item["waist_cm"] == 84.5
@@ -20,7 +20,7 @@ def test_put_then_get_round_trips_waist(aws):
     status, item = call(http_event("GET /daily-log/{date}", {"date": "2026-10-19"}))
     assert status == 200
     assert item["waist_cm"] == 84.5
-    assert item["tp_ctl"] == 72.3
+    assert item["xert_tp_w"] == 272
 
 
 def test_waist_out_of_range_rejected(aws):
@@ -80,9 +80,14 @@ def test_intervals_values_are_returned_as_prefills(aws):
     )
     status, item = call(http_event("GET /daily-log/{date}", {"date": "2026-10-20"}))
     assert status == 200
-    assert item["intervals"] == {"hrv_overnight_avg_ms": 58, "tp_ctl": 60, "tp_atl": 65, "tp_tsb": -5}
+    assert item["intervals"] == {"hrv_overnight_avg_ms": 58}  # CTL/ATL are no longer form fields
     assert "hrv_overnight_avg_ms" not in item  # not copied into the manual log
 
     status, item = call(http_event("PUT /daily-log/{date}", {"date": "2026-10-20"}, body={"hrv_overnight_avg_ms": 55}))
     assert item["hrv_overnight_avg_ms"] == 55
     assert item["intervals"]["hrv_overnight_avg_ms"] == 58
+
+
+def test_trainingpeaks_fields_are_no_longer_accepted(aws):
+    status, body = call(http_event("PUT /daily-log/{date}", {"date": "2026-10-19"}, body={"tp_tss": 80}))
+    assert status == 400 and "tp_tss" in json.dumps(body)

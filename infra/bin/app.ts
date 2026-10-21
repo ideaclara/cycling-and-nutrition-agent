@@ -66,6 +66,7 @@ new IntervalsStack(app, 'CoachIntervals', {
   env,
   athleteId: ctx('athleteId'),
   intervalsTable: data.intervalsDaily,
+  activitiesTable: data.intervalsActivities,
   httpApi: api.httpApi,
   authorizer: api.authorizer,
   backfillStartDate: '2026-01-01',
@@ -80,6 +81,7 @@ new CoachApiStack(app, 'CoachApi', {
   withingsTable: data.withingsTelemetry,
   readingsTable: data.manualReadings,
   intervalsTable: data.intervalsDaily,
+  intervalsActivitiesTable: data.intervalsActivities,
   adviceTable: data.coachAdvice,
   chatTable: data.chatMessages,
   chatBackends: {

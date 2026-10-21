@@ -16,6 +16,7 @@ export interface CoachApiStackProps extends StackProps {
   readonly withingsTable: dynamodb.ITable;
   readonly readingsTable: dynamodb.ITable;
   readonly intervalsTable: dynamodb.ITable;
+  readonly intervalsActivitiesTable: dynamodb.ITable;
   readonly adviceTable: dynamodb.ITable;
   readonly chatTable: dynamodb.ITable;
   /** Set after Module C (Bedrock Agent) and Module G (AgentCore); chat returns 503 for a backend until then. */
@@ -48,6 +49,7 @@ export class CoachApiStack extends Stack {
     const readEnv = {
       ...baseEnv,
       INTERVALS_TABLE: props.intervalsTable.tableName,
+      INTERVALS_ACTIVITIES_TABLE: props.intervalsActivitiesTable.tableName,
       READINGS_TABLE: props.readingsTable.tableName,
     };
 
@@ -98,6 +100,7 @@ export class CoachApiStack extends Stack {
     props.activitiesTable.grantReadData(getDailyMetricsFn);
     props.withingsTable.grantReadData(getDailyMetricsFn);
     props.intervalsTable.grantReadData(getDailyMetricsFn);
+    props.intervalsActivitiesTable.grantReadData(getDailyMetricsFn);
     props.readingsTable.grantReadData(getDailyMetricsFn);
 
     const logDqsFn = new PythonFunction(this, 'LogDqsEntry', {
@@ -112,12 +115,20 @@ export class CoachApiStack extends Stack {
       functionName: 'coach-action-calculate-ramp-rate',
       handlerModule: 'coach/actions/calculate_ramp_rate/handler',
       description: 'Agent action: CTL ramp rate and ATL/TSB trend',
-      environment: baseEnv,
+      environment: readEnv,
     });
     props.dailyLogTable.grantReadData(rampRateFn);
+    props.intervalsTable.grantReadData(rampRateFn);
 
     const allSources = (fn: PythonFunction) => {
-      [props.dailyLogTable, props.intervalsTable, props.readingsTable, props.withingsTable, props.activitiesTable].forEach(
+      [
+        props.dailyLogTable,
+        props.intervalsTable,
+        props.intervalsActivitiesTable,
+        props.readingsTable,
+        props.withingsTable,
+        props.activitiesTable,
+      ].forEach(
         (t) => t.grantReadData(fn),
       );
     };

@@ -4,15 +4,16 @@ Ramp rate is the change in chronic training load (CTL) expressed per week:
 
     ramp_per_week = (CTL_end - CTL_start) * 7 / days
 
-CTL values come from the TrainingPeaks fields in DailyFitnessLog. Missing days
-are allowed: the nearest logged value on or before each end of the window is used.
+CTL/ATL/TSB come from IntervalsDaily, falling back to the TrainingPeaks values
+once typed into DailyFitnessLog. Missing days are allowed: the nearest value on
+or before each end of the window is used.
 """
 
 import logging
 import os
 from datetime import date, timedelta
 
-from common import agent_io, daily_log_repo
+from common import agent_io, daily_log_repo, intervals_repo
 from common.dates import today
 
 logger = logging.getLogger()
@@ -37,32 +38,32 @@ def classify(ramp: float) -> str:
 
 
 def _nearest_on_or_before(rows: list[dict], day: str) -> dict | None:
-    eligible = [r for r in rows if r["date"] <= day and r.get("tp_ctl") is not None]
+    eligible = [r for r in rows if r["date"] <= day and r.get("ctl") is not None]
     return eligible[-1] if eligible else None
 
 
 def compute(rows: list[dict], start: date, end: date) -> dict:
-    """Pure calculation over DailyFitnessLog rows sorted by date ascending."""
+    """Pure calculation over {date, ctl, atl, tsb} rows sorted by date ascending."""
     first = _nearest_on_or_before(rows, start.isoformat())
     last = _nearest_on_or_before(rows, end.isoformat())
     if not first or not last or first["date"] >= last["date"]:
-        return {"error": "Not enough CTL data in this window. Log TrainingPeaks CTL on at least two days."}
+        return {"error": "Not enough CTL data in this window: Intervals.icu needs at least two days."}
 
     span = (date.fromisoformat(last["date"]) - date.fromisoformat(first["date"])).days
-    ramp = (last["tp_ctl"] - first["tp_ctl"]) * 7 / span
+    ramp = (last["ctl"] - first["ctl"]) * 7 / span
     trend = [
-        {k: r[k] for k in ("date", "tp_ctl", "tp_atl", "tp_tsb") if k in r}
+        {k: r[k] for k in ("date", "ctl", "atl", "tsb") if k in r}
         for r in rows
-        if start.isoformat() <= r["date"] <= end.isoformat() and r.get("tp_ctl") is not None
+        if start.isoformat() <= r["date"] <= end.isoformat() and r.get("ctl") is not None
     ]
     return {
         "window": {"start": first["date"], "end": last["date"], "days": span},
-        "ctl_start": first["tp_ctl"],
-        "ctl_end": last["tp_ctl"],
+        "ctl_start": first["ctl"],
+        "ctl_end": last["ctl"],
         "ramp_per_week": round(ramp, 2),
         "assessment": classify(ramp),
-        "latest_atl": last.get("tp_atl"),
-        "latest_tsb": last.get("tp_tsb"),
+        "latest_atl": last.get("atl"),
+        "latest_tsb": last.get("tsb"),
         "trend": trend,
     }
 
@@ -78,8 +79,12 @@ def handler(event, _context):
         return agent_io.error(event, f"days must be between 1 and {MAX_DAYS}")
 
     start = end - timedelta(days=days)
-    rows = daily_log_repo.query_range(
-        os.environ["ATHLETE_ID"], (start - timedelta(days=LOOKBACK_DAYS)).isoformat(), end.isoformat()
-    )
+    athlete, lo, hi = os.environ["ATHLETE_ID"], (start - timedelta(days=LOOKBACK_DAYS)).isoformat(), end.isoformat()
+    logs = {r["date"]: r for r in daily_log_repo.query_range(athlete, lo, hi)}
+    intervals = {r["date"]: r for r in intervals_repo.query_range(athlete, lo, hi)}
+    rows = [
+        {"date": d, **intervals_repo.load_fields(intervals.get(d), logs.get(d))}
+        for d in sorted(logs.keys() | intervals.keys())
+    ]
     result = compute(rows, start, end)
     return agent_io.respond(event, result, 200 if "error" not in result else 404)
