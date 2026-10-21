@@ -39,7 +39,8 @@ paths:
                     type: object
                     description: >-
                       Manual log fields, e.g. hrv_overnight_avg_ms, resting_hr_bpm, sleep_score,
-                      training_readiness, xert_tp_w, dqs_total, waist_cm. Days before Intervals.icu
+                      training_readiness, xert_tp_w, dqs_total, waist_cm, and the day's nutrition
+                      totals protein_g, carbs_g, fat_g, fibre_g. Days before Intervals.icu
                       may also have tp_ctl, tp_atl, tp_tsb, tp_tss and tp_if typed in from TrainingPeaks.
                   daily_log_missing:
                     type: boolean

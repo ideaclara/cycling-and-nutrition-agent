@@ -7,6 +7,7 @@ const GROUPS: { id: FieldDef['group']; title: string }[] = [
   { id: 'garmin', title: 'Garmin' },
   { id: 'xert', title: 'Xert' },
   { id: 'body', title: 'Body' },
+  { id: 'nutrition', title: 'Nutrition (daily totals)' },
 ];
 
 const label = (category: string) => category.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());

@@ -19,7 +19,10 @@ def week(aws):
     intervals = ddb.Table("IntervalsDaily")
     put_days(intervals, {f"2026-10-{d:02d}": {"hrv": 60, "restingHR": 45, "ctl": 60, "atl": 60} for d in range(12, 19)})
     put_days(intervals, {"2026-10-19": {"hrv": 48, "restingHR": 46, "sleepSecs": 25200, "ctl": 62, "atl": 70}})
-    put_days(ddb.Table("DailyFitnessLog"), {"2026-10-19": {"xert_tp_w": 250}, "2026-10-18": {"dqs_total": 14}})
+    put_days(
+        ddb.Table("DailyFitnessLog"),
+        {"2026-10-19": {"xert_tp_w": 250}, "2026-10-18": {"dqs_total": 14, "protein_g": 140, "fibre_g": 32}},
+    )
     return ddb
 
 
@@ -35,6 +38,7 @@ def test_features_compute_baselines_flags_and_levels(week):
     assert facts["status"] == "amber"
     assert facts["power_levels"][2] == {"level": 3, "name": "Tempo", "low_w": 190, "high_w": 225}
     assert facts["yesterday"]["dqs_total"] == 14
+    assert facts["yesterday"]["protein_g"] == 140 and facts["yesterday"]["fat_g"] is None
     assert facts["missing"] == []
 
 

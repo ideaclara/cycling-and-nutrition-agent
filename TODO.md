@@ -89,3 +89,10 @@ through it one milestone per Claude session.
   (via Garmin or RideWithGPS), TrainingPeaks (replaced by Intervals). Zwift events
   are out of scope.
 - Dropped: Google Fit (REST API deprecated; Health Connect is on-device only).
+- Parked (2026-10-21): automatic food-diary import. Protein, carbs, fat and fibre
+  are typed into the daily log for now. Options when resumed: FatSecret (official
+  per-user diary API, `food_entries.get`, food-by-food), MFP via Apple Health or
+  Health Connect plus an export app (daily totals), `python-myfitnesspal` (unofficial),
+  or logging meals through the coach with a Nutritionix/Edamam lookup.
+- Intervals.icu can't return rides it only received from Strava (11 stubs so far);
+  connect those apps to Intervals directly if their metrics matter.

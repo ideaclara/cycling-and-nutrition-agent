@@ -39,6 +39,11 @@ FIELDS: dict[str, Field] = {
     # (IntervalsDaily per day, IntervalsActivities per ride). Old values stay stored.
     # Body
     "waist_cm": Field("Waist", "body", 50, 150, unit="cm", decimals=1),
+    # Nutrition: daily totals typed in from the food diary (MyFitnessPal)
+    "protein_g": Field("Protein", "nutrition", 0, 600, integer=True, unit="g"),
+    "carbs_g": Field("Carbohydrate", "nutrition", 0, 2000, integer=True, unit="g"),
+    "fat_g": Field("Fat", "nutrition", 0, 500, integer=True, unit="g"),
+    "fibre_g": Field("Fibre", "nutrition", 0, 200, integer=True, unit="g"),
 }
 
 NOTES_MAX_LENGTH = 2000

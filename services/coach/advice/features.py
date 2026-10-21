@@ -102,6 +102,10 @@ def build(athlete_id: str, day: date) -> dict:
             "kilojoules": sum(r.get("kilojoules") or 0 for r in rides),
             "tss": sum(tss) if tss else None,
             "dqs_total": (logs.get(yesterday.isoformat()) or {}).get("dqs_total"),
+            **{
+                field: (logs.get(yesterday.isoformat()) or {}).get(field)
+                for field in ("protein_g", "carbs_g", "fat_g", "fibre_g")
+            },
         },
         "threshold_power_w": ftp,
         "power_levels": power_levels(ftp) if ftp else None,
