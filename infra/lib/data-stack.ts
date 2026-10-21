@@ -22,6 +22,7 @@ export class DataStack extends Stack {
   readonly manualReadings: dynamodb.Table;
   readonly intervalsDaily: dynamodb.Table;
   readonly coachAdvice: dynamodb.Table;
+  readonly chatMessages: dynamodb.Table;
   readonly dataBucket: s3.Bucket;
   readonly kbSourceBucket: s3.Bucket;
   readonly evalBucket: s3.Bucket;
@@ -82,6 +83,15 @@ export class DataStack extends Stack {
       tableName: 'CoachAdvice',
       partitionKey: { name: 'athleteId', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'date', type: dynamodb.AttributeType.STRING },
+    });
+
+    // Chat transcripts: PK sessionId, SK "<ISO time>#<role>", expired by TTL after 30 days.
+    this.chatMessages = new dynamodb.Table(this, 'ChatMessages', {
+      ...tableDefaults,
+      tableName: 'ChatMessages',
+      partitionKey: { name: 'sessionId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'ts', type: dynamodb.AttributeType.STRING },
+      timeToLiveAttribute: 'ttl',
     });
 
     const bucketDefaults = {

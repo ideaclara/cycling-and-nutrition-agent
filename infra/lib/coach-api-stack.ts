@@ -17,6 +17,9 @@ export interface CoachApiStackProps extends StackProps {
   readonly readingsTable: dynamodb.ITable;
   readonly intervalsTable: dynamodb.ITable;
   readonly adviceTable: dynamodb.ITable;
+  readonly chatTable: dynamodb.ITable;
+  /** Set after Module C (Bedrock Agent) and Module G (AgentCore); chat returns 503 for a backend until then. */
+  readonly chatBackends: { agentId?: string; agentAliasId?: string; agentRuntimeArn?: string };
   /** Inference profile ID for the daily advice (the `flow` role in config/models.json). */
   readonly adviceModelId: string;
   /** Guardrail built by hand in Module B; advice runs without one until it's set. */
@@ -187,6 +190,41 @@ export class CoachApiStack extends Stack {
       }),
       target: new schedulerTargets.LambdaInvoke(adviceFn, { retryAttempts: 1 }),
     });
+
+    const { agentId, agentAliasId, agentRuntimeArn } = props.chatBackends;
+    const chatFn = new PythonFunction(this, 'Chat', {
+      functionName: 'coach-chat',
+      handlerModule: 'coach/chat/handler',
+      description: 'Coach chat: Bedrock Agent (Module C) or AgentCore Runtime (Module G)',
+      timeout: Duration.seconds(29), // HTTP API gives up at 30 s
+      environment: {
+        ...baseEnv,
+        CHAT_TABLE: props.chatTable.tableName,
+        ...(agentId && agentAliasId ? { AGENT_ID: agentId, AGENT_ALIAS_ID: agentAliasId } : {}),
+        ...(agentRuntimeArn ? { AGENT_RUNTIME_ARN: agentRuntimeArn } : {}),
+      },
+    });
+    props.chatTable.grantReadWriteData(chatFn);
+    if (agentId && agentAliasId) {
+      chatFn.addToRolePolicy(
+        new iam.PolicyStatement({
+          actions: ['bedrock:InvokeAgent'],
+          resources: [`arn:aws:bedrock:${this.region}:${this.account}:agent-alias/${agentId}/${agentAliasId}`],
+        }),
+      );
+    }
+    if (agentRuntimeArn) {
+      chatFn.addToRolePolicy(
+        new iam.PolicyStatement({
+          actions: ['bedrock-agentcore:InvokeAgentRuntime'],
+          resources: [agentRuntimeArn, `${agentRuntimeArn}/runtime-endpoint/*`],
+        }),
+      );
+    }
+    this.addRoutes(props, new HttpLambdaIntegration('ChatIntegration', chatFn), [
+      ['/chat', apigw.HttpMethod.POST],
+      ['/chat/{sessionId}', apigw.HttpMethod.GET],
+    ]);
 
     new CfnOutput(this, 'GetDailyMetricsArn', { value: getDailyMetricsFn.functionArn });
     new CfnOutput(this, 'LogDqsEntryArn', { value: logDqsFn.functionArn });

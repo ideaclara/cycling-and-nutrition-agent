@@ -22,10 +22,15 @@ const ctx = (key: string): string => {
   return value;
 };
 
+function optionalContext(key: string): string | undefined {
+  const value = app.node.tryGetContext(key);
+  return typeof value === 'string' && value ? value : undefined;
+}
+
 // Set after Module B: -c guardrailId=<id> -c guardrailVersion=1 (or in cdk.json).
 function optionalGuardrail(): { id: string; version: string } | undefined {
-  const id = app.node.tryGetContext('guardrailId');
-  return typeof id === 'string' && id ? { id, version: String(app.node.tryGetContext('guardrailVersion') ?? '1') } : undefined;
+  const id = optionalContext('guardrailId');
+  return id ? { id, version: optionalContext('guardrailVersion') ?? '1' } : undefined;
 }
 
 // Everything lives in the region named in config/models.json (us-east-1).
@@ -76,6 +81,12 @@ new CoachApiStack(app, 'CoachApi', {
   readingsTable: data.manualReadings,
   intervalsTable: data.intervalsDaily,
   adviceTable: data.coachAdvice,
+  chatTable: data.chatMessages,
+  chatBackends: {
+    agentId: optionalContext('agentId'),
+    agentAliasId: optionalContext('agentAliasId'),
+    agentRuntimeArn: optionalContext('agentRuntimeArn'),
+  },
   adviceModelId: models.roles.flow.modelId as string,
   guardrail: optionalGuardrail(),
   httpApi: api.httpApi,

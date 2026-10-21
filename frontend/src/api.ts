@@ -87,4 +87,20 @@ export interface Advice {
 
 export const getLatestAdvice = () => request<Advice>('/advice/latest');
 export const refreshAdvice = () => request<Advice>('/advice/refresh', { method: 'POST' });
+export type ChatBackend = 'agent' | 'agentcore';
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  text: string;
+  at: string;
+  backend: ChatBackend;
+  citations?: { source: string; title?: string; excerpt: string }[];
+  steps?: string[];
+  guardrail?: string | null;
+  latency_ms?: number;
+}
+
+export const sendChat = (message: string, sessionId: string, backend: ChatBackend) =>
+  request<ChatMessage>('/chat', { method: 'POST', body: JSON.stringify({ message, sessionId, backend }) });
+export const getChat = (sessionId: string) => request<{ items: ChatMessage[] }>(`/chat/${sessionId}`);
 export const syncStrava = () => request<{ message: string; queued: number }>('/strava/sync', { method: 'POST' });
