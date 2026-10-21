@@ -107,3 +107,28 @@ def test_daily_fields_mapping():
         "tp_tsb": -4.8,
     }
     assert as_daily_fields(None) == {}
+
+
+def test_requests_send_a_user_agent(monkeypatch):
+    """Cloudflare blocks urllib's default agent with a 403 (error 1010)."""
+    from common import intervals_api
+
+    sent = {}
+
+    class Resp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+        def read(self):
+            return b"[]"
+
+    def fake_urlopen(req, timeout):
+        sent.update(req.headers)
+        return Resp()
+
+    monkeypatch.setattr(intervals_api.urllib.request, "urlopen", fake_urlopen)
+    intervals_api.get("/athlete/0/wellness", intervals_api.Credentials("0", "k"))
+    assert sent["User-agent"].startswith("cycling-coach/")

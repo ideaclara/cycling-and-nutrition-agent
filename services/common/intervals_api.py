@@ -17,6 +17,8 @@ from dataclasses import dataclass
 import boto3
 
 API_BASE = "https://intervals.icu/api/v1"
+# Cloudflare in front of intervals.icu rejects urllib's default "Python-urllib" agent (error 1010).
+USER_AGENT = "cycling-coach/1.0 (+https://github.com/ideaclara/cycling-and-nutrition-agent)"
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +58,9 @@ def get(path: str, creds: Credentials, params: dict | None = None):
     if params:
         url = f"{url}?{urllib.parse.urlencode(params)}"
     token = base64.b64encode(f"API_KEY:{creds.api_key}".encode()).decode()
-    req = urllib.request.Request(url, headers={"Authorization": f"Basic {token}", "Accept": "application/json"})
+    req = urllib.request.Request(
+        url, headers={"Authorization": f"Basic {token}", "Accept": "application/json", "User-Agent": USER_AGENT}
+    )
     try:
         with urllib.request.urlopen(req, timeout=25) as resp:
             return json.loads(resp.read().decode("utf-8"))
