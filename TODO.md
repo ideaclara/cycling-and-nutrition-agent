@@ -48,17 +48,28 @@ through it one milestone per Claude session.
 
 ### Milestones
 
-1. [ ] Intervals.icu ingestion (`IntervalsDaily`), then the **form field review**:
+1. [~] Intervals.icu ingestion (`IntervalsDaily`), then the **form field review**:
        for each Garmin, TrainingPeaks, Xert, body and DQS field, decide remove,
        prefill from Intervals, or keep manual. Plus BP and body temperature
        readings with timestamps (`ManualReadings`).
-2. [ ] Eating-behaviour KB: review the strategy doc, gap analysis, proposed
+       - [x] sync Lambda, table, prefills, readings API and form section (deployed)
+       - [ ] **Matt:** create the `intervals/api` secret and run the probe (labs/03-intervals.md)
+       - [ ] form field review with the probe output
+2. [~] Eating-behaviour KB: review the strategy doc, gap analysis, proposed
        open-access sources, `eating_behaviour/` handler in `prepare_kb_docs.py`
-3. [ ] Module B runbook
-4. [ ] Analysis page: design discussion, then `GET /analysis/series` and charts
-5. [ ] Daily advice v1 (Converse), `CoachAdvice` table, advice card
-6. [ ] Module C runbook, chat Lambda and Coach tab on Bedrock Agents
-7. [ ] Module G runbook, AgentCore chat backend and switch
+       - [x] handler, gap analysis (`documentation/kb-eating-behaviour-review.md`, local only)
+       - [ ] **Matt:** fix the flagged claims, download papers, upload new files, sync the 3 data sources
+       - [ ] rerun the comparison with the eating-behaviour queries
+3. [x] Module B runbook (`documentation/labs/B-guardrails.md`); **Matt** builds the guardrail,
+       then set `guardrailId` / `guardrailVersion` in `infra/cdk.json` so advice uses it
+4. [~] Analysis page: design discussion, then `GET /analysis/series` and charts
+       - [x] `GET /analysis/series` (deployed)
+       - [ ] design discussion, then charts
+5. [x] Daily advice v1 (Converse), `CoachAdvice` table, advice card, 07:30 schedule
+6. [~] Module C runbook, chat Lambda and Coach tab on Bedrock Agents
+       - [x] chat Lambda (both backends, 503 until configured) and Coach tab
+       - [ ] Module C runbook; then set `agentId` / `agentAliasId` in `infra/cdk.json`
+7. [ ] Module G runbook, AgentCore agent code; then set `agentRuntimeArn`
 8. [ ] RideWithGPS routes, ride weather (Open-Meteo), calculator MCP server
 9. [ ] Modules D, E, F; move daily advice to v2 and v3
 
