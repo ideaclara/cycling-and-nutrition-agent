@@ -65,10 +65,13 @@ through it one milestone per Claude session.
 4. [~] Analysis page: design discussion, then `GET /analysis/series` and charts
        - [x] `GET /analysis/series` (deployed)
        - [ ] design discussion, then charts
-5. [x] Daily advice v1 (Converse), `CoachAdvice` table, advice card, 07:30 schedule
+5. [~] Daily advice v1 (Converse), `CoachAdvice` table, advice card, 07:30 schedule (deployed)
+       - [ ] **Blocked:** Claude 5.5 models return "not available for this account" (Haiku 4.5,
+             Sonnet 4.5 and Nova work). Request access, or switch `flow`/`agent` to Haiku 4.5.
 6. [~] Module C runbook, chat Lambda and Coach tab on Bedrock Agents
        - [x] chat Lambda (both backends, 503 until configured) and Coach tab
-       - [ ] Module C runbook; then set `agentId` / `agentAliasId` in `infra/cdk.json`
+       - [x] Module C runbook (`documentation/labs/C-agents.md`)
+       - [ ] **Matt:** build the agent; then set `agentId` / `agentAliasId` in `infra/cdk.json`
 7. [ ] Module G runbook, AgentCore agent code; then set `agentRuntimeArn`
 8. [ ] RideWithGPS routes, ride weather (Open-Meteo), calculator MCP server
 9. [ ] Modules D, E, F; move daily advice to v2 and v3
