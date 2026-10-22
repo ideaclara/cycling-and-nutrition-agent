@@ -63,4 +63,4 @@ def day_summary(record: dict | None) -> dict | None:
     """Totals and per-meal totals without the individual entries, for the agent and charts."""
     if not record:
         return None
-    return {k: record[k] for k in ("totals", "meals", "entries_count") if k in record}
+    return {k: record[k] for k in ("totals", "meals", "entries_count", "coverage") if k in record}

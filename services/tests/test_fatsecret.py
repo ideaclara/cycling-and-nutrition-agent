@@ -26,6 +26,8 @@ DIARY = {
             "fat": "5.6",
             "fiber": "8.0",
             "sodium": "5",
+            "calcium": "2",
+            "potassium": "300",
         },
         {
             "food_entry_id": "2",
@@ -144,6 +146,18 @@ def test_day_totals_meals_and_entries(fatsecret):
         "fat_g": 23.6,
         "fiber_g": 14.5,
         "sodium_mg": 5,
+        "potassium_mg": 300,
+        "calcium_pct_dv": 2,
+    }
+    assert day["coverage"] == {
+        "calories_kcal": 2,
+        "carbohydrate_g": 2,
+        "protein_g": 2,
+        "fat_g": 2,
+        "fiber_g": 2,
+        "sodium_mg": 1,
+        "potassium_mg": 1,
+        "calcium_pct_dv": 1,
     }
     assert day["meals"]["breakfast"] == {
         "calories_kcal": 300,

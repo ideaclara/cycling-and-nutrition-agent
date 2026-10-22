@@ -7,7 +7,7 @@ Triggered by the EventBridge schedule or by ``POST /fatsecret/sync``.
   often added or corrected a day or two later.
 - ``food_entries.get_month`` lists the days that have entries (one call per
   month); only those days are fetched with ``food_entries.get``, which gives
-  the full nutrients (fibre, sugar, sodium, ...) of every entry.
+  the full nutrients (fibre, sugar, sodium, minerals, vitamins) of every entry.
 - Only days that changed are written, so a repeat run writes nothing. A stored
   day whose entries were all deleted in FatSecret is deleted here too.
 
@@ -33,7 +33,9 @@ logger.setLevel(logging.INFO)
 LOOKBACK_DAYS = 7
 BOOKKEEPING = {"athleteId", "date", "source", "fetched_at"}
 
-# Our name -> FatSecret food_entry field. Units: kcal, grams, except sodium (mg).
+# Our name -> FatSecret food_entry field; the suffix is the unit. FatSecret's docs
+# give calcium and iron in mg and vitamin A in micrograms, but the values returned
+# (chickpea soup "7" calcium, brown rice "3" iron) are % of daily value.
 NUTRIENTS = {
     "calories_kcal": "calories",
     "carbohydrate_g": "carbohydrate",
@@ -42,7 +44,15 @@ NUTRIENTS = {
     "fiber_g": "fiber",
     "sugar_g": "sugar",
     "saturated_fat_g": "saturated_fat",
+    "monounsaturated_fat_g": "monounsaturated_fat",
+    "polyunsaturated_fat_g": "polyunsaturated_fat",
+    "cholesterol_mg": "cholesterol",
     "sodium_mg": "sodium",
+    "potassium_mg": "potassium",
+    "calcium_pct_dv": "calcium",
+    "iron_pct_dv": "iron",
+    "vitamin_a_pct_dv": "vitamin_a",
+    "vitamin_c_pct_dv": "vitamin_c",
 }
 MEAL_NUTRIENTS = ("calories_kcal", "carbohydrate_g", "protein_g", "fat_g", "fiber_g")
 
@@ -99,9 +109,14 @@ def to_entry(record: dict) -> dict:
 
 
 def to_item(day: date, records: list[dict]) -> dict:
-    """Totals, per-meal totals and the entries for one day."""
+    """Totals, per-meal totals and the entries for one day.
+
+    `coverage` counts the entries that have each nutrient: FatSecret only has
+    fibre, sugar and the micronutrients for some foods, so a total can be low.
+    """
     entries = [to_entry(r) for r in records]
     totals = {name: _sum(entries, name) for name in NUTRIENTS}
+    coverage = {name: sum(1 for e in entries if e.get(name) is not None) for name in NUTRIENTS}
     meals = {}
     for meal in sorted({e["meal"] for e in entries}):
         rows = [e for e in entries if e["meal"] == meal]
@@ -113,6 +128,7 @@ def to_item(day: date, records: list[dict]) -> dict:
         "totals": {k: v for k, v in totals.items() if v is not None},
         "meals": meals,
         "entries_count": len(entries),
+        "coverage": {k: v for k, v in coverage.items() if v},
         "entries": entries,
     }
 

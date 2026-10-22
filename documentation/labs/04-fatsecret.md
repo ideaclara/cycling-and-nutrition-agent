@@ -20,9 +20,16 @@ POST /fatsecret/sync ───┴─> fatsecret-sync ──> food_entries.get_mo
 - **Later runs:** it re-fetches the last 7 days, because entries are often added or
   corrected later. Only days that changed are written. A day you clear in FatSecret
   is deleted from the table.
-- **What's stored per day:** `totals` (calories_kcal, carbohydrate_g, protein_g, fat_g,
-  fiber_g, sugar_g, saturated_fat_g, sodium_mg), `meals` (the main totals for breakfast,
-  lunch, dinner and other), `entries_count`, and `entries` (each food with its nutrients).
+- **What's stored per day:**
+  - `totals`: calories_kcal, carbohydrate_g, protein_g, fat_g, fiber_g, sugar_g,
+    saturated_fat_g, monounsaturated_fat_g, polyunsaturated_fat_g, cholesterol_mg,
+    sodium_mg, potassium_mg, and calcium, iron, vitamin A and vitamin C as % of daily
+    value (`*_pct_dv`). FatSecret's docs give mg and micrograms for those four, but the
+    values it returns are percentages.
+  - `meals`: the main totals for breakfast, lunch, dinner and other.
+  - `entries_count`, and `coverage`: how many entries had each nutrient. FatSecret has
+    fibre, sugar and the micronutrients for only some foods, so those totals are minimums.
+  - `entries`: each food with its nutrients.
 - **What reads it:**
   - The daily form shows protein, carbs, fat and fibre as placeholders marked "From
     FatSecret". Typing a value overrides it, and only what you type is saved.

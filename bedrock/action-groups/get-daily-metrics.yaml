@@ -56,8 +56,11 @@ paths:
                     description: >-
                       FatSecret food diary for the day, or null if nothing was logged. totals has
                       calories_kcal, carbohydrate_g, protein_g, fat_g, fiber_g, sugar_g,
-                      saturated_fat_g and sodium_mg; meals has the same main totals per meal
-                      (breakfast, lunch, dinner, other); entries_count is the number of foods logged.
+                      saturated_fat_g, monounsaturated_fat_g, polyunsaturated_fat_g, cholesterol_mg,
+                      sodium_mg, potassium_mg, and calcium, iron, vitamin A and vitamin C as % of
+                      daily value (*_pct_dv). meals has the main totals per meal (breakfast, lunch,
+                      dinner, other); entries_count is the number of foods logged, and coverage says
+                      how many of them had each nutrient (a total from few foods is a minimum).
                   readings:
                     type: array
                     description: >-
