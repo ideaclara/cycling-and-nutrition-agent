@@ -73,12 +73,19 @@ def main():
         action = resp["action"]
         ok = action == case["expect"]
         failures += not ok
-        fired = ", ".join(reasons(resp.get("assessments", []))) or "-"
-        print(f"{'PASS' if ok else 'FAIL'}  {case['id']:<22} {action:<22} {fired}")
-        if action == "GUARDRAIL_INTERVENED" and resp.get("outputs"):
-            print(f"      -> {resp['outputs'][0]['text'][:140]}")
+        fired = ", ".join(reasons(resp.get("assessments", [])))
+        if action == "GUARDRAIL_INTERVENED":
+            returned = " ".join(o["text"] for o in resp.get("outputs", []))
+            outcome = f"{fired or action} --> {returned}"
+        else:
+            outcome = f"NONE ({fired})" if fired else "NONE"
+        query = f"  [query: {case['query']}]" if "query" in case else ""
+        print(f"{'PASS' if ok else 'FAIL'}  {case['id']} ({case['source']}): {case['text']}{query}")
+        print(f"      expect:  {case['expect']}")
+        print(f"      outcome: {outcome}")
+        print()
 
-    print(f"\n{len(cases) - failures}/{len(cases)} as expected")
+    print(f"{len(cases) - failures}/{len(cases)} as expected")
     sys.exit(1 if failures else 0)
 
 
