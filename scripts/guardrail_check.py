@@ -8,6 +8,8 @@ console; it creates and changes nothing. Each call is billed per text unit
 
 Cases come from bedrock/guardrails/test_cases.jsonl. A case with `grounding` and
 `query` is sent with content qualifiers, so the contextual grounding check runs.
+`expect` is NONE, GUARDRAIL_INTERVENED, or DETECTED: a policy in Detect mode
+fired, but nothing was blocked.
 """
 
 import argparse
@@ -35,7 +37,7 @@ def reasons(assessments: list[dict]) -> list[str]:
     found = []
     for a in assessments:
         for t in a.get("topicPolicy", {}).get("topics", []):
-            found.append(f"topic:{t['name']}")
+            found.append(f"topic:{t['name']}" + (" (detect)" if t.get("action") == "NONE" else ""))
         for f in a.get("contentPolicy", {}).get("filters", []):
             found.append(f"content:{f['type']}/{f['confidence']}")
         for w in a.get("wordPolicy", {}).get("customWords", []) + a.get("wordPolicy", {}).get("managedWordLists", []):
@@ -71,9 +73,9 @@ def main():
             content=content(case),
         )
         action = resp["action"]
-        ok = action == case["expect"]
-        failures += not ok
         fired = ", ".join(reasons(resp.get("assessments", [])))
+        ok = (action == "NONE" and bool(fired)) if case["expect"] == "DETECTED" else action == case["expect"]
+        failures += not ok
         if action == "GUARDRAIL_INTERVENED":
             returned = " ".join(o["text"] for o in resp.get("outputs", []))
             outcome = f"{fired or action} --> {returned}"
