@@ -5,9 +5,10 @@ GET /daily-log/{date}        one day
 GET /daily-log?from=&to=     inclusive range (max 366 days)
 GET /daily-log/schema        field definitions, so the form never drifts from the API
 
-Single-day responses carry an `intervals` object: the Intervals.icu values for
-that day, renamed to daily-log fields. The form shows them as prefills; they
-are never written to DailyFitnessLog unless the user saves them.
+Single-day responses carry an `intervals` object (Intervals.icu wellness) and a
+`fatsecret` object (food diary totals): values for that day, renamed to
+daily-log fields. The form shows them as prefills; they are never written to
+DailyFitnessLog unless the user saves them.
 """
 
 import json
@@ -16,7 +17,7 @@ import os
 from dataclasses import asdict
 from datetime import date, timedelta
 
-from common import daily_log_repo, dqs_table, intervals_repo
+from common import daily_log_repo, dqs_table, fatsecret_repo, intervals_repo
 from common.daily_log_schema import FIELDS, ValidationError, validate_update
 from common.dates import today
 from common.http import json_body, response
@@ -52,9 +53,10 @@ def get_schema() -> dict:
 
 def _with_intervals(day: str, item: dict | None) -> dict | None:
     intervals = intervals_repo.as_daily_fields(intervals_repo.get(_athlete_id(), day))
-    if not item and not intervals:
+    fatsecret = fatsecret_repo.as_daily_fields(fatsecret_repo.get(_athlete_id(), day))
+    if not item and not intervals and not fatsecret:
         return None
-    return {**(item or {"date": day}), "intervals": intervals}
+    return {**(item or {"date": day}), "intervals": intervals, "fatsecret": fatsecret}
 
 
 def get_day(day: str) -> dict:

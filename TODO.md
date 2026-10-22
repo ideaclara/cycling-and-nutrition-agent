@@ -17,7 +17,15 @@ table for citation, but the coach should use these values from a tool.
 4. **Use them together** for anything that predicts training load or builds a
    plan: a workout's target watts from the levels, its expected XSS from
    duration and intensity, and the day's carbohydrate target from the planned load.
-5. **Choose the delivery** and write it down:
+5. **Weight-loss feasibility.** For "I'd like to lose 2 kg before the season
+   starts", the coach works out the maths instead of refusing (the guardrail lets
+   these through): days until the target date, the weekly loss that implies, and
+   whether it fits a safe rate (about 0.5–1% of body weight a week, from the
+   latest Withings weight). If it doesn't fit (the season starts tomorrow), say so
+   and give what is possible in that time; if it does, give the daily energy
+   deficit and how to protect training fuel. A deterministic calculator
+   (`weight_loss_plan(current_kg, target_kg, target_date)`) next to `carb_target`.
+6. **Choose the delivery** and write it down:
    - a plain Python module behind a Bedrock action group (the simplest, and the
      same pattern as `log_dqs_entry`), or
    - an **MCP server** exposing `power_levels(ftp)`, `carb_target(weight_kg, load)`
@@ -89,10 +97,12 @@ through it one milestone per Claude session.
   (via Garmin or RideWithGPS), TrainingPeaks (replaced by Intervals). Zwift events
   are out of scope.
 - Dropped: Google Fit (REST API deprecated; Health Connect is on-device only).
-- Parked (2026-10-21): automatic food-diary import. Protein, carbs, fat and fibre
-  are typed into the daily log for now. Options when resumed: FatSecret (official
-  per-user diary API, `food_entries.get`, food-by-food), MFP via Apple Health or
-  Health Connect plus an export app (daily totals), `python-myfitnesspal` (unofficial),
-  or logging meals through the coach with a Nutritionix/Edamam lookup.
+- Food diary (2026-10-22): moving from MyFitnessPal to FatSecret. `fatsecret-sync`
+  fills `FatSecretDaily` (OAuth 1.0, 3-legged) and prefills protein, carbs, fat and fibre.
+  - [x] client, sync Lambda, table, prefills, advice/agent/analysis wiring (deployed)
+  - [ ] **Matt:** API keys, `fatsecret/oauth` secret, `scripts/fatsecret_authorize.py`,
+        probe and backfill (labs/04-fatsecret.md)
+  - [ ] after a few weeks of FatSecret data: decide whether the four nutrition form
+        fields stay as overrides or go
 - Intervals.icu can't return rides it only received from Strava (11 stubs so far);
   connect those apps to Intervals directly if their metrics matter.

@@ -24,6 +24,8 @@ export type DailyLog = Record<string, unknown> & {
   dqs_total?: number;
   /** Intervals.icu values for the day, keyed by daily-log field. Shown as prefills, never saved automatically. */
   intervals?: Record<string, number>;
+  /** FatSecret food diary totals (protein, carbs, fat, fibre), keyed by daily-log field. Prefills too. */
+  fatsecret?: Record<string, number>;
 };
 
 export type ReadingType = 'BP' | 'TEMP';
@@ -68,6 +70,8 @@ export const putDay = (date: string, changes: Record<string, unknown>) =>
   request<DailyLog>(`/daily-log/${date}`, { method: 'PUT', body: JSON.stringify(changes) });
 export const syncIntervals = () =>
   request<{ fetched: number; written: number }>('/intervals/sync', { method: 'POST' });
+export const syncFatSecret = () =>
+  request<{ days_with_entries: number; written: number }>('/fatsecret/sync', { method: 'POST' });
 export const getReadingsSchema = () => request<ReadingsSchema>('/readings/schema');
 export const getReadings = (from: string, to: string) =>
   request<{ items: Reading[] }>(`/readings?from=${from}&to=${to}`);

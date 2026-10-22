@@ -6,8 +6,8 @@ info:
     Read the athlete's consolidated data for one calendar day: the manual daily log
     (Garmin recovery, Xert fitness signature, Diet Quality Score, waist measurement),
     the Intervals.icu wellness and fitness record, that day's rides from Intervals.icu
-    (TSS, IF, normalized power), blood pressure and temperature readings, the latest
-    Withings scale reading, and that day's Strava rides.
+    (TSS, IF, normalized power), the FatSecret food diary totals, blood pressure and
+    temperature readings, the latest Withings scale reading, and that day's Strava rides.
 paths:
   /daily-metrics:
     get:
@@ -17,7 +17,8 @@ paths:
         Use this before giving any training or nutrition recommendation, to ground
         advice in the athlete's actual HRV, sleep, readiness, form (TSB) and recent
         rides. Prefer a value in daily_log when present (the athlete typed it); otherwise
-        use intervals. If both are missing, say the value is unknown instead of guessing.
+        use intervals (recovery) or fatsecret (nutrition). If both are missing, say the
+        value is unknown instead of guessing.
       parameters:
         - name: date
           in: query
@@ -50,6 +51,13 @@ paths:
                       Intervals.icu record for the day (synced from Garmin): hrv (ms), restingHR (bpm),
                       sleepSecs, sleepScore, readiness, weight (kg), ctl (fitness), atl (fatigue),
                       rampRate. Form (TSB) is ctl minus atl.
+                  fatsecret:
+                    type: object
+                    description: >-
+                      FatSecret food diary for the day, or null if nothing was logged. totals has
+                      calories_kcal, carbohydrate_g, protein_g, fat_g, fiber_g, sugar_g,
+                      saturated_fat_g and sodium_mg; meals has the same main totals per meal
+                      (breakfast, lunch, dinner, other); entries_count is the number of foods logged.
                   readings:
                     type: array
                     description: >-

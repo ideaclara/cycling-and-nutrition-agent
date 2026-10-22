@@ -16,7 +16,7 @@ function tabFromHash(): Tab {
 import { AdviceCard } from './AdviceCard';
 import { AnalysisPage } from './AnalysisPage';
 import { Chat } from './Chat';
-import { type Schema, getSchema, syncIntervals, syncStrava } from './api';
+import { type Schema, getSchema, syncFatSecret, syncIntervals, syncStrava } from './api';
 import { DailyLogForm } from './DailyLogForm';
 
 function LoggedIn({ signOut }: { signOut?: () => void }) {
@@ -33,7 +33,7 @@ function LoggedIn({ signOut }: { signOut?: () => void }) {
 
   const onSync = () => {
     setSyncMessage('Syncing…');
-    Promise.allSettled([syncStrava(), syncIntervals()]).then(([strava, intervals]) => {
+    Promise.allSettled([syncStrava(), syncIntervals(), syncFatSecret()]).then(([strava, intervals, fatsecret]) => {
       const parts = [
         strava.status === 'fulfilled'
           ? `Strava: ${strava.value?.queued ?? 0} new activities queued`
@@ -41,6 +41,9 @@ function LoggedIn({ signOut }: { signOut?: () => void }) {
         intervals.status === 'fulfilled'
           ? `Intervals: ${intervals.value?.written ?? 0} days updated`
           : `Intervals: ${intervals.reason.message}`,
+        fatsecret.status === 'fulfilled'
+          ? `FatSecret: ${fatsecret.value?.written ?? 0} days updated`
+          : `FatSecret: ${fatsecret.reason.message}`,
       ];
       setSyncMessage(parts.join(' · '));
     });

@@ -11,6 +11,7 @@ from and choose which one wins:
      "withings": {...last scale session that day...},
      "strava": {"activities": 1, "moving_time_s": 7200, "distance_m": 60000, "kilojoules": 1500, ...},
      "rides": {"tss": 120, "rides": [{"tss": 120, "intensity_factor": 0.77, "normalized_power_w": 217, ...}]},
+     "fatsecret": {"totals": {"calories_kcal": 2650, "protein_g": 140, ...}, "meals": {...}, "entries_count": 9},
      "bp": [{"time": "07:00", "systolic_mmhg": 118, ...}], "temp": [{"time": "07:05", "temp_c": 36.7}]}
 
 Days with no data at all are still returned, so charts get a continuous x-axis.
@@ -21,7 +22,7 @@ import logging
 import os
 from datetime import date, timedelta
 
-from common import daily_log_repo, intervals_repo, metrics_repo, readings_repo
+from common import daily_log_repo, fatsecret_repo, intervals_repo, metrics_repo, readings_repo
 from common.dates import today
 from common.http import response
 
@@ -80,6 +81,8 @@ def series(start: date, end: date) -> list[dict]:
         day = rows[activity["start_date_local"][:10]].setdefault("rides", {"tss": 0, "rides": []})
         day["tss"] += activity.get("icu_training_load") or 0
         day["rides"].append(intervals_repo.activity_summary(activity))
+    for item in fatsecret_repo.query_range(athlete, lo, hi):
+        rows[item["date"]]["fatsecret"] = fatsecret_repo.day_summary(item)
     for reading in readings_repo.query(athlete, start, end):
         key = "bp" if reading["type"] == "BP" else "temp"
         values = {k: v for k, v in reading.items() if k.endswith(("_mmhg", "_bpm", "_c"))}

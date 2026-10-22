@@ -7,6 +7,7 @@ advice and the analysis API.
 - WithingsTelemetry: scale sessions (timestamped)
 - StravaActivities: activities (summaries only, never the raw payload)
 - IntervalsActivities: per-ride TSS, IF, normalized power and the other Intervals metrics
+- FatSecretDaily: food diary totals per day and per meal
 """
 
 import os
@@ -15,7 +16,7 @@ from datetime import date, datetime, timedelta
 import boto3
 from boto3.dynamodb.conditions import Key
 
-from common import daily_log_repo, intervals_repo, readings_repo
+from common import daily_log_repo, fatsecret_repo, intervals_repo, readings_repo
 from common.dates import day_bounds_epoch, local_tz
 from common.ddb import from_dynamo
 
@@ -144,6 +145,7 @@ def day_snapshot(day: date) -> dict:
         "daily_log": log,
         "daily_log_missing": log is None,
         "intervals": intervals_repo.get(_athlete_id(), day.isoformat()),
+        "fatsecret": fatsecret_repo.day_summary(fatsecret_repo.get(_athlete_id(), day.isoformat())),
         "readings": readings_repo.query(_athlete_id(), day, day) if os.environ.get("READINGS_TABLE") else [],
         "withings_latest": latest_withings(day),
         "strava_activities": activities_on(day),

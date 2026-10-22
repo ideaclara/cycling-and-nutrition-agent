@@ -17,6 +17,8 @@ os.environ.update(
     INTERVALS_TABLE="IntervalsDaily",
     INTERVALS_ACTIVITIES_TABLE="IntervalsActivities",
     INTERVALS_SECRET_ID="intervals/api",
+    FATSECRET_TABLE="FatSecretDaily",
+    FATSECRET_SECRET_ID="fatsecret/oauth",
     ADVICE_TABLE="CoachAdvice",
     CHAT_TABLE="ChatMessages",
     DATA_BUCKET="test-data-bucket",
@@ -51,6 +53,7 @@ def aws():
         _table(ddb, "ManualReadings", "athleteId", "sk")
         _table(ddb, "IntervalsDaily", "athleteId", "date")
         _table(ddb, "IntervalsActivities", "athleteId", "sk")
+        _table(ddb, "FatSecretDaily", "athleteId", "date")
         _table(ddb, "CoachAdvice", "athleteId", "date")
         _table(ddb, "ChatMessages", "sessionId", "ts")
         boto3.client("s3").create_bucket(Bucket="test-data-bucket")

@@ -2,23 +2,25 @@
 
 Everything numeric is computed here, deterministically, so the model only has
 to write: it never does arithmetic on HRV baselines or watt ranges itself.
-A manually typed value wins over the Intervals.icu value for the same field.
+A manually typed value wins over the Intervals.icu or FatSecret value for the same field.
 """
 
 from datetime import date, timedelta
 from statistics import mean
 
-from common import daily_log_repo, intervals_repo, metrics_repo, readings_repo
+from common import daily_log_repo, fatsecret_repo, intervals_repo, metrics_repo, readings_repo
 from common.power_levels import power_levels
 
 BASELINE_DAYS = 7
 LOOKBACK_DAYS = 28
+NUTRITION_FIELDS = ("protein_g", "carbs_g", "fat_g", "fibre_g")
 
 
-def _merged(log: dict | None, intervals: dict | None) -> dict:
-    """Daily-log fields, filled from Intervals where the log has no value, plus ctl/atl/tsb."""
+def _merged(log: dict | None, intervals: dict | None, fatsecret: dict | None = None) -> dict:
+    """Daily-log fields, filled from Intervals and FatSecret where the log has no value, plus ctl/atl/tsb."""
     return {
         **intervals_repo.as_daily_fields(intervals),
+        **fatsecret_repo.as_daily_fields(fatsecret),
         **(log or {}),
         **intervals_repo.load_fields(intervals, log),
     }
@@ -51,8 +53,9 @@ def build(athlete_id: str, day: date) -> dict:
     start = day - timedelta(days=LOOKBACK_DAYS)
     logs = {i["date"]: i for i in daily_log_repo.query_range(athlete_id, start.isoformat(), day.isoformat())}
     intervals = {i["date"]: i for i in intervals_repo.query_range(athlete_id, start.isoformat(), day.isoformat())}
+    food = {i["date"]: i for i in fatsecret_repo.query_range(athlete_id, start.isoformat(), day.isoformat())}
     by_day = {
-        d.isoformat(): _merged(logs.get(d.isoformat()), intervals.get(d.isoformat()))
+        d.isoformat(): _merged(logs.get(d.isoformat()), intervals.get(d.isoformat()), food.get(d.isoformat()))
         for d in (start + timedelta(days=n) for n in range(LOOKBACK_DAYS + 1))
     }
     today = by_day[day.isoformat()]
@@ -102,10 +105,8 @@ def build(athlete_id: str, day: date) -> dict:
             "kilojoules": sum(r.get("kilojoules") or 0 for r in rides),
             "tss": sum(tss) if tss else None,
             "dqs_total": (logs.get(yesterday.isoformat()) or {}).get("dqs_total"),
-            **{
-                field: (logs.get(yesterday.isoformat()) or {}).get(field)
-                for field in ("protein_g", "carbs_g", "fat_g", "fibre_g")
-            },
+            **{field: by_day[yesterday.isoformat()].get(field) for field in NUTRITION_FIELDS},
+            "calories_kcal": ((food.get(yesterday.isoformat()) or {}).get("totals") or {}).get("calories_kcal"),
         },
         "threshold_power_w": ftp,
         "power_levels": power_levels(ftp) if ftp else None,

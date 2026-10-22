@@ -22,6 +22,7 @@ export class DataStack extends Stack {
   readonly manualReadings: dynamodb.Table;
   readonly intervalsDaily: dynamodb.Table;
   readonly intervalsActivities: dynamodb.Table;
+  readonly fatSecretDaily: dynamodb.Table;
   readonly coachAdvice: dynamodb.Table;
   readonly chatMessages: dynamodb.Table;
   readonly dataBucket: s3.Bucket;
@@ -85,6 +86,14 @@ export class DataStack extends Stack {
       tableName: 'IntervalsActivities',
       partitionKey: { name: 'athleteId', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'sk', type: dynamodb.AttributeType.STRING },
+    });
+
+    // FatSecret food diary: totals, per-meal totals and entries, one item per day (SK = YYYY-MM-DD).
+    this.fatSecretDaily = new dynamodb.Table(this, 'FatSecretDaily', {
+      ...tableDefaults,
+      tableName: 'FatSecretDaily',
+      partitionKey: { name: 'athleteId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'date', type: dynamodb.AttributeType.STRING },
     });
 
     // Daily advice, one item per day (SK = YYYY-MM-DD), with the facts it was based on.

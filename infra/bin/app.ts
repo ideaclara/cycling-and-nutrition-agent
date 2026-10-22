@@ -8,6 +8,7 @@ import { CoachApiStack } from '../lib/coach-api-stack';
 import { DataStack } from '../lib/data-stack';
 import { FrontendStack } from '../lib/frontend-stack';
 import { IntervalsStack } from '../lib/intervals-stack';
+import { FatSecretStack } from '../lib/fatsecret-stack';
 import { StravaStack } from '../lib/strava-stack';
 import { WithingsStack } from '../lib/withings-stack';
 
@@ -72,6 +73,15 @@ new IntervalsStack(app, 'CoachIntervals', {
   backfillStartDate: '2026-01-01',
 });
 
+new FatSecretStack(app, 'CoachFatSecret', {
+  env,
+  athleteId: ctx('athleteId'),
+  fatSecretTable: data.fatSecretDaily,
+  httpApi: api.httpApi,
+  authorizer: api.authorizer,
+  backfillStartDate: '2026-10-01',
+});
+
 new CoachApiStack(app, 'CoachApi', {
   env,
   athleteId: ctx('athleteId'),
@@ -82,6 +92,7 @@ new CoachApiStack(app, 'CoachApi', {
   readingsTable: data.manualReadings,
   intervalsTable: data.intervalsDaily,
   intervalsActivitiesTable: data.intervalsActivities,
+  fatSecretTable: data.fatSecretDaily,
   adviceTable: data.coachAdvice,
   chatTable: data.chatMessages,
   chatBackends: {

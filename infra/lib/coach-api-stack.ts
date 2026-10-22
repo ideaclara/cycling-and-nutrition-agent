@@ -17,6 +17,7 @@ export interface CoachApiStackProps extends StackProps {
   readonly readingsTable: dynamodb.ITable;
   readonly intervalsTable: dynamodb.ITable;
   readonly intervalsActivitiesTable: dynamodb.ITable;
+  readonly fatSecretTable: dynamodb.ITable;
   readonly adviceTable: dynamodb.ITable;
   readonly chatTable: dynamodb.ITable;
   /** Set after Module C (Bedrock Agent) and Module G (AgentCore); chat returns 503 for a backend until then. */
@@ -50,6 +51,7 @@ export class CoachApiStack extends Stack {
       ...baseEnv,
       INTERVALS_TABLE: props.intervalsTable.tableName,
       INTERVALS_ACTIVITIES_TABLE: props.intervalsActivitiesTable.tableName,
+      FATSECRET_TABLE: props.fatSecretTable.tableName,
       READINGS_TABLE: props.readingsTable.tableName,
     };
 
@@ -61,6 +63,7 @@ export class CoachApiStack extends Stack {
     });
     props.dailyLogTable.grantReadWriteData(dailyLogFn);
     props.intervalsTable.grantReadData(dailyLogFn);
+    props.fatSecretTable.grantReadData(dailyLogFn);
 
     const integration = new HttpLambdaIntegration('DailyLogIntegration', dailyLogFn);
     const routes: [string, apigw.HttpMethod][] = [
@@ -102,6 +105,7 @@ export class CoachApiStack extends Stack {
     props.intervalsTable.grantReadData(getDailyMetricsFn);
     props.intervalsActivitiesTable.grantReadData(getDailyMetricsFn);
     props.readingsTable.grantReadData(getDailyMetricsFn);
+    props.fatSecretTable.grantReadData(getDailyMetricsFn);
 
     const logDqsFn = new PythonFunction(this, 'LogDqsEntry', {
       functionName: 'coach-action-log-dqs-entry',
@@ -125,6 +129,7 @@ export class CoachApiStack extends Stack {
         props.dailyLogTable,
         props.intervalsTable,
         props.intervalsActivitiesTable,
+        props.fatSecretTable,
         props.readingsTable,
         props.withingsTable,
         props.activitiesTable,

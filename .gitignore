@@ -52,3 +52,4 @@ documentation/inference-profiles-us-east-1.txt
 # public. Keep them local; tests use services/tests/fixtures/activity_redacted.json.
 documentation/initial-setup-documentation/strava-example-responses/*.json
 documentation/initial-setup-documentation/intervals-example-responses/
+documentation/initial-setup-documentation/fatsecret-example-responses/

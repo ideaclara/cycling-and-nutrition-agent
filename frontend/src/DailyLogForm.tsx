@@ -91,7 +91,14 @@ export function DailyLogForm({ schema }: { schema: Schema }) {
     }
   };
 
-  const prefill = loaded.intervals ?? {};
+  // Prefills: Intervals.icu for recovery fields, FatSecret for nutrition totals.
+  const prefill: Record<string, { value: number; source: string }> = {};
+  for (const [source, values] of [
+    ['Intervals.icu', loaded.intervals],
+    ['FatSecret', loaded.fatsecret],
+  ] as const) {
+    for (const [name, value] of Object.entries(values ?? {})) prefill[name] = { value, source };
+  }
 
   return (
     <>
@@ -127,15 +134,15 @@ export function DailyLogForm({ schema }: { schema: Schema }) {
                       type="number"
                       inputMode="decimal"
                       name={name}
-                      placeholder={prefill[name] != null ? String(prefill[name]) : undefined}
+                      placeholder={prefill[name] ? String(prefill[name].value) : undefined}
                       min={def.minimum}
                       max={def.maximum}
                       step={stepFor(def)}
                       value={inputs[name] ?? ''}
                       onChange={(e) => setInputs({ ...inputs, [name]: e.target.value })}
                     />
-                    {prefill[name] != null && (inputs[name] ?? '') === '' && (
-                      <span className="hint">From Intervals.icu</span>
+                    {prefill[name] && (inputs[name] ?? '') === '' && (
+                      <span className="hint">From {prefill[name].source}</span>
                     )}
                     {errors[name] && <span className="error">{errors[name]}</span>}
                   </label>
