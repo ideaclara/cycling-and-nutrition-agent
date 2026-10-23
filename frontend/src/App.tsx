@@ -90,6 +90,9 @@ function LoggedIn({ signOut }: { signOut?: () => void }) {
 }
 
 export default function App() {
-  // Self sign-up is disabled in Cognito, so only the sign-in screen is shown.
-  return <Authenticator hideSignUp>{({ signOut }) => <LoggedIn signOut={signOut} />}</Authenticator>;
+  // Sign-up uses the email address as the username, and Cognito's pre-sign-up trigger
+  // rejects addresses that aren't on the allowlist. With email MFA on, the Authenticator
+  // asks for the six-digit code Cognito emails after the password.
+  // The email-only sign-in comes from loginWith: { email: true } in main.tsx.
+  return <Authenticator>{({ signOut }) => <LoggedIn signOut={signOut} />}</Authenticator>;
 }

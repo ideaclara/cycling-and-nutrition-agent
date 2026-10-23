@@ -18,6 +18,8 @@
     "withingsUserId": "31179536",
     "budgetEmail": "matt@ideaclara.com",
     "githubSubjectPrefix": "repo:ideaclara@47756684/cycling-and-nutrition-agent@1425874626",
+    "authEmailDomain": "ideaclara.com",
+    "emailMfa": "false",
     "@aws-cdk/core:defaultCrossStackReferences": "strong",
     "@aws-cdk/aws-lambda:recognizeLayerVersion": true,
     "@aws-cdk/core:checkSecretUsage": true,

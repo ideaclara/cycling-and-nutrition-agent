@@ -46,7 +46,13 @@ const data = new DataStack(app, 'CoachData', {
   projectTag,
 });
 
-const api = new ApiStack(app, 'CoachApiGateway', { env });
+// Sign-in emails: authEmailDomain creates the SES identity; emailMfa ("true") turns on
+// password + emailed code once SES shows the domain as verified (documentation/labs/05-sign-in.md).
+const api = new ApiStack(app, 'CoachApiGateway', {
+  env,
+  authEmailDomain: optionalContext('authEmailDomain'),
+  emailMfa: optionalContext('emailMfa') === 'true',
+});
 
 new StravaStack(app, 'CoachStrava', {
   env,
