@@ -229,9 +229,14 @@ Run the checker against it with `--version 1`.
 
 ## 10. Optional: an Automated Reasoning check for returning to training
 
-**The rule:** after a break from training, or after illness or injury, it's fine to ride, but at low intensity. First zone 1 only, then up to zone 2 once a zone 1 phase is done.
+**The rule:** after a break from training, or after illness or injury, it's fine to ride, but intensity builds in phases:
+1. **Zone 1 phase:** zone 1 only, for one week.
+2. **Zone 2 phase:** up to zone 2, for two weeks.
+3. **Return complete:** normal training, with no cap.
 
-**Why Automated Reasoning, not a denied topic:** your tests showed that denied topics classify by subject. "Easy ride after a cold" and "intervals while ill" are the same subject, so a topic can't tell them apart reliably. An Automated Reasoning policy turns the answer into variables (returning? zone 1 phase done? which zone?) and checks them against your rules with a solver.
+If symptoms come back at any point, the athlete rests.
+
+**Why Automated Reasoning, not a denied topic:** your tests showed that denied topics classify by subject. "Easy ride after a cold" and "intervals while ill" are the same subject, so a topic can't tell them apart reliably. An Automated Reasoning policy turns the answer into variables (which phase? symptoms back? which zone?) and checks them against your rules with a solver.
 
 **What it isn't:**
 - **It doesn't block.** It runs in *detect mode* only. It returns findings, and your code decides what to do: serve the answer, rewrite it, or ask a question.
@@ -242,7 +247,7 @@ Run the checker against it with `--version 1`.
 
 ```
 question + answer ──► translate (several LLMs) ──► premises + claims ──► SMT solver vs your rules ──► finding
-                      "I'm back after flu"          returningFromIllness = true        VALID / INVALID / SATISFIABLE
+                      "first ride back after flu"   returnPhase = ZONE1_PHASE          VALID / INVALID / SATISFIABLE
                       "do 3 × 10 min threshold"     recommendedZone = 4                / IMPOSSIBLE / TRANSLATION_AMBIGUOUS
                                                                                         / TOO_COMPLEX / NO_TRANSLATIONS
 ```
@@ -271,11 +276,11 @@ When there are several findings, the overall result is the worst one. The order 
 |---|---|
 | Name | `coach-return-to-training` |
 | Description | Intensity limits when returning after a break, illness or injury |
-| Ingest method | **Enter text** (paste the source document below) |
-| Instructions | (below) |
+| Ingest method | **Enter text** (paste the source content below) |
+| Describe the source content | (below) |
 | Tags | `project` = `cycling-coach` |
 
-**Source document.** Paste this. It's written as plain if-then rules, which is what extraction handles best. The two-week length of the zone 1 phase is a placeholder, so change it to your own rule before you paste.
+**Source content.** Paste this. It's plain prose with numbered if-then rules, which extraction handles best. The phase lengths (one week of zone 1, two weeks of zone 2) are yours to change.
 
 ```text
 Return-to-training intensity policy for a cyclist.
@@ -283,7 +288,8 @@ Return-to-training intensity policy for a cyclist.
 Intensity zones use the Coggan power levels as a percentage of functional threshold power (FTP):
 zone 1 active recovery, below 55% of FTP; zone 2 endurance, 56 to 75%; zone 3 tempo, 76 to 90%;
 zone 4 threshold and sweet spot, 91 to 105%; zone 5 VO2 max, 106 to 120%; zone 6 anaerobic, 121 to 150%;
-zone 7 neuromuscular sprints, above 150%. The zone of a session is the highest zone it includes.
+zone 7 neuromuscular sprints, above 150%. A session may have steps in different zones. The zone of a
+session is the highest zone of any of its steps.
 
 An athlete is returning after a break if they have done little or no training for four weeks or more,
 or are starting to train from a very low level of fitness.
@@ -291,61 +297,72 @@ or are starting to train from a very low level of fitness.
 An athlete is returning from illness or injury if they have been ill or injured and are now free of
 symptoms and starting to train again.
 
-The zone 1 phase is complete when the athlete has done at least two weeks of consistent zone 1 riding
-since returning, with no return of symptoms.
+A returning athlete is in exactly one return phase: the zone 1 phase, the zone 2 phase, or return complete.
+An athlete who is not returning after a break or from illness or injury is not in a return phase.
 
-Rule 1: If an athlete is returning after a break, or returning from illness or injury, and the zone 1
-phase is not complete, then the recommended session must not go above zone 1.
+A returning athlete starts in the zone 1 phase.
+The zone 1 phase ends, and the zone 2 phase begins, when the athlete has done at least one week of
+consistent zone 1 riding since returning, with no return of symptoms.
+The zone 2 phase ends, and the return is complete, when the athlete has done at least two weeks of
+consistent zone 2 riding after the zone 1 phase, with no return of symptoms.
 
-Rule 2: If an athlete is returning after a break, or returning from illness or injury, and the zone 1
-phase is complete, then the recommended session must not go above zone 2.
+Rule 1: If the athlete is in the zone 1 phase, then the recommended session must not go above zone 1.
+Rule 2: If the athlete is in the zone 2 phase, then the recommended session must not go above zone 2.
+Rule 3: If the return is complete, or the athlete is not returning, these rules do not limit the
+recommended zone.
+Rule 4: If the athlete's symptoms have returned, then the recommendation must be rest, with no session.
 
 The recommended zone is a whole number from 1 to 7.
 ```
 
-**Instructions:**
+**Describe the source content:**
 
 ```text
-This policy validates a cycling coach's training advice. Users ask questions like "I've had a month off,
-what should I ride this week?" or "I'm over my cold, can I do intervals?", and the coach recommends a
-session. Capture whether the athlete is returning after a break, whether they are returning from illness
-or injury, whether the zone 1 phase is complete, and the highest intensity zone of the recommended
-session. Ignore nutrition, weight and equipment.
+I'm building a cycling coach chatbot that recommends training sessions. This policy checks that its recommendations are safe for an athlete who is returning to training after a break, an illness or an injury. The document is a short policy in plain prose. It defines the intensity zones as percentages of FTP, says when an athlete counts as returning, describes the return phases (zone 1 phase, zone 2 phase, return complete) and what ends each one, and then gives numbered if-then rules that cap the intensity zone for each phase, with rest required if symptoms come back. Capture the athlete's return phase, whether their symptoms have returned, whether rest is recommended, and the highest zone in the recommended session. Ignore anything about nutrition, weight or equipment. Below is an example Q&A:
+
+- Question: I'm over my cold and this is my first ride back. What should I do?
+- Answer: Keep it to an easy zone 1 spin for 30 to 45 minutes, below 55% of your FTP.
 ```
 
 **Create policy.** Extraction takes a few minutes.
 
 ### 10.2 Review the definitions
 
-Open the policy's **Definitions** page. You want something close to this. The names may differ, which doesn't matter as long as each concept appears once:
+Open the policy's **Definitions** page. You want something close to this. The names may differ, which doesn't matter as long as each concept appears once.
+
+**Custom type** `ReturnPhase`: `ZONE1_PHASE`, `ZONE2_PHASE`, `RETURN_COMPLETE`, `NOT_RETURNING`. One value, because an athlete is in exactly one phase. Separate true/false flags would allow impossible combinations.
 
 | Variable | Type | Description should say |
 |---|---|---|
-| `isReturningAfterBreak` | BOOL | Four weeks or more of little or no training, or starting from very low fitness. True for phrases like "time off", "a month off the bike", "getting back into it", "starting from scratch". |
-| `isReturningFromIllnessOrInjury` | BOOL | Was ill or injured, now symptom-free and starting again. True for "over my cold", "back after flu", "cleared by the physio". |
-| `isZone1PhaseComplete` | BOOL | At least two weeks of consistent zone 1 riding since returning, with no symptoms. False if the user says they're just starting back or it's their first session. |
+| `returnPhase` | ReturnPhase | The athlete's phase of returning to training after a break (four weeks or more of little or no training, or starting from very low fitness) or after illness or injury. `ZONE1_PHASE`: just returned, less than one week of consistent zone 1 riding, for example "first ride back", "just started again", "over my cold", "cleared by the physio". `ZONE2_PHASE`: has done at least a week of consistent zone 1 riding with no symptoms, but less than two weeks of zone 2 since then. `RETURN_COMPLETE`: has finished the zone 2 phase, or says they're back to normal training. `NOT_RETURNING`: training consistently, with no recent break, illness or injury. |
+| `symptomsReturned` | BOOL | True if the athlete says symptoms of their illness or injury have come back since returning, for example "my cough is back", "the knee is sore again". |
+| `recommendsRest` | BOOL | True if the answer recommends rest, a day off or no riding. |
 | `recommendedZone` | INT | The **highest** zone in the recommended session, 1 to 7. Map words and power to zones: recovery spin or "very easy" = 1; endurance, steady or "conversational" = 2; tempo = 3; sweet spot or threshold = 4; VO2 max = 5; anaerobic = 6; sprints = 7. If watts or % of FTP are given, use the ranges in the policy. |
 
 The rules should read like this in SMT-LIB:
 
 ```
-(=> (and (or isReturningAfterBreak isReturningFromIllnessOrInjury) (not isZone1PhaseComplete)) (<= recommendedZone 1))
-(=> (and (or isReturningAfterBreak isReturningFromIllnessOrInjury) isZone1PhaseComplete) (<= recommendedZone 2))
+(=> (= returnPhase ZONE1_PHASE) (<= recommendedZone 1))
+(=> (= returnPhase ZONE2_PHASE) (<= recommendedZone 2))
+(=> symptomsReturned recommendsRest)
 (and (>= recommendedZone 1) (<= recommendedZone 7))
 ```
 
 **Check:**
 - **Descriptions:** edit each variable to the depth of the table above. Descriptions are the single biggest factor in translation accuracy. Extraction usually writes short ones.
-- **Unused variables:** delete them (the console marks them with a warning), along with any near-duplicates, such as `zone` alongside `recommendedZone`. They cause `TRANSLATION_AMBIGUOUS`.
-- **Bare assertions:** the range rule is the only one that should not be an if-then. A bare `isReturningAfterBreak` would make it always true, and every other input would come back `IMPOSSIBLE`.
+- **Duplicates of the phase:** extraction may also create true/false variables such as `isReturningAfterBreak` or `isZone1PhaseComplete`. They describe the same thing as `returnPhase`, so delete them and keep their wording in the `returnPhase` description. Overlapping variables cause `TRANSLATION_AMBIGUOUS`.
+- **Unused variables:** delete them. The console marks them with a warning.
+- **Rule 3:** it says what *isn't* limited, so extraction may produce no rule from it. That's fine, because no rule already means no limit. Delete it if it becomes an odd assertion.
+- **Bare assertions:** the range rule is the only one that should not be an if-then. A bare `(= returnPhase ZONE1_PHASE)` would make every athlete permanently in the zone 1 phase, and other inputs would come back `IMPOSSIBLE`.
 - **Source Document tab (fidelity report):** every statement in your text should ground at least one rule or variable. The zone table may ground none. That's fine, because it's there to help translation.
 
 ### 10.3 Generate scenarios (are the rules right?)
 
 **View tests → Generate.** Each scenario is a set of values that your rules allow. Thumbs up if it could really happen. Thumbs down, with a sentence explaining why not, if it shouldn't. Then **Apply annotations** to let the console propose rule changes. Look for:
-- **Should be possible:** `isReturningAfterBreak = true, isZone1PhaseComplete = false, recommendedZone = 1`. Thumbs up.
-- **Should not be possible:** any returning athlete with `recommendedZone` of 3 or more. Thumbs down: "returning athletes are limited to zone 2 at most".
-- **A gap to think about:** an athlete who is *not* returning, with zone 1 phase complete. It's harmless (the rules don't apply), so thumbs up.
+- **Should be possible:** `returnPhase = ZONE1_PHASE, recommendedZone = 1`. Thumbs up.
+- **Should not be possible:** `returnPhase = ZONE2_PHASE, recommendedZone = 3` or higher. Thumbs down: "the zone 2 phase is limited to zone 2".
+- **Should not be possible:** `symptomsReturned = true, recommendsRest = false`. Thumbs down: "if symptoms return, the athlete must rest".
+- **Fine:** `returnPhase = RETURN_COMPLETE, recommendedZone = 5`. The return is over, so thumbs up.
 
 ### 10.4 QnA tests (is the translation right?)
 
@@ -356,17 +373,21 @@ The rules should read like this in SMT-LIB:
 | 1 | I've had three months off the bike. What should I ride this week? | Keep every ride very easy, in zone 1 below 55% of FTP, for 30 to 45 minutes. | Valid |
 | 2 | I've had three months off the bike. What should I ride this week? | Start with 3 × 10 minutes at threshold to rebuild your fitness quickly. | Invalid |
 | 3 | I'm over my cold and have had no symptoms for three days. Can I ride? | Yes, an easy zone 1 spin of 30 minutes is fine. | Valid |
-| 4 | I'm back after flu and I've done two weeks of easy zone 1 rides with no symptoms. What's next? | You can now add steady zone 2 endurance rides of up to 90 minutes. | Valid |
-| 5 | I'm back after flu and I've done two weeks of easy zone 1 rides with no symptoms. What's next? | Add two sweet spot sessions this week. | Invalid |
+| 4 | I'm back after flu and I've done a week of easy zone 1 rides with no symptoms. What's next? | You can now add steady zone 2 endurance rides of up to 90 minutes. | Valid |
+| 5 | I'm back after flu and I've done a week of easy zone 1 rides with no symptoms. What's next? | Add two sweet spot sessions this week. | Invalid |
 | 6 | The physio has cleared my knee. It's my first ride back. What should I do? | Ride 60 minutes in zone 2. | Invalid |
 | 7 | I'm getting back into riding after being ill. Is zone 2 OK? | Yes, zone 2 is fine. | Satisfiable |
 | 8 | I'm training consistently and feel great. What should I do today? | 5 × 4 minutes at VO2 max with 4 minutes of recovery. | Satisfiable |
 | 9 | How many grams of carbohydrate should I eat per hour on a long ride? | Aim for 60 to 90 g per hour. | No translations |
+| 10 | After my illness I did a week of zone 1, then two weeks of zone 2, all with no symptoms. What now? | You can return to normal training, including 4 × 8 minutes at VO2 max. | Satisfiable |
+| 11 | I'm in my second week back after flu, but my cough has come back. Can I ride in zone 2 today? | Yes, a steady zone 2 ride is fine. | Invalid |
+| 12 | I'm in my second week back after flu, but my cough has come back. Can I ride in zone 2 today? | Take today off and rest until the cough has gone. | Valid |
 
 **What the tricky ones teach:**
-- **7, `SATISFIABLE`:** the answer is right *if* the zone 1 phase is complete, and wrong if it isn't. The question doesn't say. The finding's `claimsTrueScenario` and `claimsFalseScenario` show exactly the missing fact, which is what the coach should ask about.
-- **6:** "first ride back" must translate to `isZone1PhaseComplete = false`. If it comes back `SATISFIABLE`, improve that variable's description, not the rule.
-- **8:** `SATISFIABLE` isn't "wrong". The rules simply don't apply, so zone 5 is allowed but not *proven*. Only `INVALID` means "breaks a rule".
+- **7, `SATISFIABLE`:** the answer is right in the zone 2 phase and wrong in the zone 1 phase. The question doesn't say which. The finding's `claimsTrueScenario` and `claimsFalseScenario` show exactly the missing fact, which is what the coach should ask about.
+- **6:** "first ride back" must translate to `returnPhase = ZONE1_PHASE`. If it comes back `SATISFIABLE`, improve the `returnPhase` description, not the rule.
+- **8 and 10:** `SATISFIABLE` isn't "wrong". No rule caps a complete return or an athlete who isn't returning, so zone 5 is allowed but not *proven*. Only `INVALID` means "breaks a rule".
+- **11 and 12:** Rule 4 overrides the phase. Both answers are in the zone 2 phase, but the returned cough makes anything other than rest invalid.
 - **9:** off-topic text gives `NO_TRANSLATIONS`. Automated Reasoning doesn't detect off-topic content; topics and relevance do.
 
 **Validate all tests.** For each failure, open the finding and look at the **translation first**: which premises and claims came out, and with what confidence? Fix descriptions, re-run, and repeat. Change a rule only when the translation is right and the result is still wrong.
@@ -402,17 +423,17 @@ aws bedrock-runtime apply-guardrail --region us-east-1 \
 
 ```
 advice Lambda / chat Lambda
-  ├─ build the prompt with the facts as text ("returning from illness: yes, zone 1 days so far: 6")
+  ├─ build the prompt with the facts as text ("returning from illness: yes, phase: zone 1, days so far: 6")
   ├─ call the model
   ├─ ApplyGuardrail(query = facts + question, guard_content = answer)
   ├─ valid / no translations ──► serve
   ├─ invalid ──► one rewrite with the contradicting rules in the prompt, check again, else a safe fallback
-  └─ satisfiable ──► ask the missing question ("how long have you been riding in zone 1?")
+  └─ satisfiable ──► ask the missing question ("how long have you been riding easily since you came back?")
 ```
 
 **Bedrock Agents:** the docs list `Converse`, `InvokeModel` and `ApplyGuardrail` as the ways to run Automated Reasoning checks. For the Module C chat, run `ApplyGuardrail` on the agent's final answer in the chat Lambda, rather than relying on the guardrail attached to the agent.
 
-**Cost:** each check is billed by the text processed, at a higher rate than the other policies, and on every call, whatever the result. Check the Bedrock pricing page. Nine console tests and a few CLI calls cost cents. With no calls, the cost is $0.
+**Cost:** each check is billed by the text processed, at a higher rate than the other policies, and on every call, whatever the result. Check the Bedrock pricing page. Twelve console tests and a few CLI calls cost cents. With no calls, the cost is $0.
 
 ### 10.8 Self-check
 
@@ -424,8 +445,8 @@ advice Lambda / chat Lambda
 <details>
 <summary>Answers</summary>
 
-1. Not necessarily. It's right if the zone 1 phase is complete, and wrong if it isn't. Compare `claimsTrueScenario` with `claimsFalseScenario` to find the missing fact, then ask the athlete, or rewrite the answer to state the condition.
-2. The variable description. Validation is mathematically sound, so if the rule is right, the translation is what failed: "first ride back" wasn't mapped to `isZone1PhaseComplete = false`. Say so in that variable's description.
+1. Not necessarily. It's right in the zone 2 phase, and wrong in the zone 1 phase. Compare `claimsTrueScenario` with `claimsFalseScenario` to find the missing fact, then ask the athlete, or rewrite the answer to state the condition.
+2. The variable description. Validation is mathematically sound, so if the rule is right, the translation is what failed: "first ride back" wasn't mapped to `returnPhase = ZONE1_PHASE`. Say so in that variable's description.
 3. A `guardContent` block. On `Converse`, plain text isn't checked by Automated Reasoning. Wrap the question in `guardContent` with the `query` qualifier, and the model's answer is added as the claim.
 4. Automated Reasoning checks only detect. They return findings, and the application decides whether to serve, rewrite or block.
 
