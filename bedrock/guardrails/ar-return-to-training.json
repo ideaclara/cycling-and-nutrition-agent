@@ -1,0 +1,92 @@
+{
+  "version": "1",
+  "types": [
+    {
+      "name": "TrainingState",
+      "description": "The athlete's training state, set by whether they are ill or injured now and how many days ago they started riding again.",
+      "values": [
+        {
+          "value": "do_not_ride",
+          "description": "Ill or injured now: rest, no riding."
+        },
+        {
+          "value": "zone_1_phase",
+          "description": "Started riding again 7 days ago or less: zone 1 only."
+        },
+        {
+          "value": "zone_2_phase",
+          "description": "Started riding again 8 to 21 days ago: up to zone 2."
+        },
+        {
+          "value": "normal",
+          "description": "Started riding again more than 21 days ago, or not returning from a break or illness: any zone."
+        }
+      ]
+    }
+  ],
+  "rules": [
+    {
+      "id": "E9MCXQEQGH2Q",
+      "expression": "(=> isIllOrInjured (= trainingState do_not_ride))"
+    },
+    {
+      "id": "TXG01K118JAM",
+      "expression": "(=> (and (not isIllOrInjured) (<= daysSinceStartedRidingAgain 7)) (= trainingState zone_1_phase))"
+    },
+    {
+      "id": "RBBPWQEDUTI9",
+      "expression": "(=> (and (not isIllOrInjured) (> daysSinceStartedRidingAgain 7) (<= daysSinceStartedRidingAgain 21)) (= trainingState zone_2_phase))"
+    },
+    {
+      "id": "FWXRNERA5T10",
+      "expression": "(=> (and (not isIllOrInjured) (> daysSinceStartedRidingAgain 21)) (= trainingState normal))"
+    },
+    {
+      "id": "RECOQ1OQZ0AY",
+      "expression": "(= recommendsRest (= trainingState do_not_ride))"
+    },
+    {
+      "id": "OTOGCOIZ5ZTD",
+      "expression": "(=> (= trainingState zone_1_phase) (<= highestZoneInActivity 1))"
+    },
+    {
+      "id": "JSA02FP0PV2V",
+      "expression": "(=> (= trainingState zone_2_phase) (<= highestZoneInActivity 2))"
+    },
+    {
+      "id": "C4ZXA0GWSKQJ",
+      "expression": "(and (>= highestZoneInActivity 1) (<= highestZoneInActivity 7))"
+    },
+    {
+      "id": "B9UVWANMJ331",
+      "expression": "(>= daysSinceStartedRidingAgain 0)"
+    }
+  ],
+  "variables": [
+    {
+      "name": "isIllOrInjured",
+      "type": "BOOL",
+      "description": "True if the athlete is ill or injured NOW, or says symptoms have come back (for example 'I have a bad cold', 'my knee is injured', 'my cough is back'). False if they say they have recovered, are over it, are healthy, or started riding again after the illness or injury (for example 'after being sick', 'recovered from the flu', 'the physio has cleared me')."
+    },
+    {
+      "name": "daysSinceStartedRidingAgain",
+      "type": "INT",
+      "description": "How many days ago the athlete started riding again after a break, illness or injury. Convert weeks to days (1 week = 7, 2 weeks = 14, 3 weeks = 21); 'first ride back' or 'today' is 0. If the athlete is training normally with no recent break, illness or injury, or says they have been back for months, use 365."
+    },
+    {
+      "name": "trainingState",
+      "type": "TrainingState",
+      "description": "The athlete's training state: do_not_ride, zone_1_phase, zone_2_phase or normal. Set it only if the text names the state; otherwise it follows from the rules."
+    },
+    {
+      "name": "recommendsRest",
+      "type": "BOOL",
+      "description": "True if the answer tells the athlete to rest, take the day off or not ride. False if the answer recommends any ride or session."
+    },
+    {
+      "name": "highestZoneInActivity",
+      "type": "INT",
+      "description": "The highest power zone, 1 to 7, in any part of the ride the answer recommends or permits. Zone 1 (active recovery, very easy, recovery spin) is below 55% of FTP; zone 2 (endurance, steady) is 56 to 75% of FTP; zones 3 to 7 (tempo, sweet spot, threshold, VO2 max, anaerobic, sprints) are above 75% of FTP. 'Keep power below 55% of FTP' or 'zone 1 only' means 1; 'up to zone 2' means 2; 'any zone' means 7."
+    }
+  ]
+}

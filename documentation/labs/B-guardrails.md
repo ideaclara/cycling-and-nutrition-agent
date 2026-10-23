@@ -229,178 +229,183 @@ Run the checker against it with `--version 1`.
 
 ## 10. Optional: an Automated Reasoning check for returning to training
 
-**The rule:** after a break from training, or after illness or injury, it's fine to ride, but intensity builds in phases:
-1. **Zone 1 phase:** zone 1 only, for one week.
-2. **Zone 2 phase:** up to zone 2, for two weeks.
-3. **Return complete:** normal training, with no cap.
+**The rule:** after a break, illness or injury, intensity builds in phases:
 
-If symptoms come back at any point, the athlete rests.
+| Training state | When | Allowed |
+|---|---|---|
+| `do_not_ride` | Ill or injured now, or symptoms have come back | Rest only |
+| `zone_1_phase` | Started riding again 7 days ago or less | Zone 1 only |
+| `zone_2_phase` | Started riding again 8 to 21 days ago | Up to zone 2 |
+| `normal` | More than 21 days back, or not returning at all | Any zone |
 
-**Why Automated Reasoning, not a denied topic:** your tests showed that denied topics classify by subject. "Easy ride after a cold" and "intervals while ill" are the same subject, so a topic can't tell them apart reliably. An Automated Reasoning policy turns the answer into variables (which phase? symptoms back? which zone?) and checks them against your rules with a solver.
+**Why Automated Reasoning, not a denied topic:** your tests showed that denied topics classify by subject. "Easy ride after a cold" and "intervals while ill" are the same subject, so a topic can't tell them apart reliably. An Automated Reasoning policy turns the question and answer into variables (ill now? days back? which zone?) and checks them against your rules with a solver.
 
 **What it isn't:**
 - **It doesn't block.** It runs in *detect mode* only. It returns findings, and your code decides what to do: serve the answer, rewrite it, or ask a question.
-- **It only sees text.** "Returning from illness" must be in the question or the answer. Your data in DynamoDB (Strava gaps, for example) has to be put into the text first, by the agent or the advice Lambda.
+- **It only sees text.** "Not ill, 3 days back" must be in the question or the answer. Your data in DynamoDB has to be put into the text first, by the agent or the advice Lambda.
 - **It checks answers, not prompts.** It doesn't run on an `INPUT`-only check.
 
 ### How it works
 
 ```
 question + answer ──► translate (several LLMs) ──► premises + claims ──► SMT solver vs your rules ──► finding
-                      "first ride back after flu"   returnPhase = ZONE1_PHASE          VALID / INVALID / SATISFIABLE
-                      "do 3 × 10 min threshold"     recommendedZone = 4                / IMPOSSIBLE / TRANSLATION_AMBIGUOUS
-                                                                                        / TOO_COMPLEX / NO_TRANSLATIONS
+                      "not injured, 4 days back"    isIllOrInjured = false,            VALID / INVALID / SATISFIABLE
+                                                    daysSinceStartedRidingAgain = 4    / IMPOSSIBLE / TRANSLATION_AMBIGUOUS
+                      "keep it all in zone 1"       highestZoneInActivity = 1          / TOO_COMPLEX / NO_TRANSLATIONS
 ```
 
-- **Translation uses LLMs and can be wrong.** Several models translate independently, and how far they agree is the **confidence**. Below your confidence threshold you get `TRANSLATION_AMBIGUOUS`.
+- **Translation uses LLMs and can be wrong.** Several models translate independently, and how far they agree is the **confidence** (1.0 means they all agreed). Below your confidence threshold you get `TRANSLATION_AMBIGUOUS`.
 - **Validation is mathematical and sound.** When a test fails and the rules look right, the problem is almost always the translation, so fix the **variable descriptions**.
-- **The results:**
+- **The solver tries to make the claims true and tries to make them false**, filling in anything the text didn't settle:
 
-| Result | Meaning | What the app does |
-|---|---|---|
-| `VALID` | The claims follow from the premises and the rules | Serve it |
-| `INVALID` | The claims break a rule (`contradictingRules` says which) | Rewrite or block |
-| `SATISFIABLE` | True under some conditions, false under others: the answer is incomplete | Add the missing condition or ask the user |
-| `IMPOSSIBLE` | The premises contradict each other, or the rules conflict | Check the input, then the policy |
-| `TRANSLATION_AMBIGUOUS` | The translating models disagreed | Improve the descriptions, or ask the user |
-| `TOO_COMPLEX` | Too much to reason about in time | Shorten the input or simplify the policy |
-| `NO_TRANSLATIONS` | Nothing relates to the policy | Not this policy's business |
+| Can be true? | Can be false? | Result | What the app does |
+|---|---|---|---|
+| Yes | No | `VALID`: the claims follow, whatever the unknowns | Serve it |
+| No | Yes | `INVALID`: no choice of unknowns makes them true (`contradictingRules` says which rule) | Rewrite or block |
+| Yes | Yes | `SATISFIABLE`: it depends on something the text doesn't settle | See below |
 
-When there are several findings, the overall result is the worst one. The order from worst to best is `TRANSLATION_AMBIGUOUS`, `IMPOSSIBLE`, `INVALID`, `SATISFIABLE`, `VALID`.
+The other results are `IMPOSSIBLE` (the premises or rules contradict each other), `TRANSLATION_AMBIGUOUS` (the models disagreed), `TOO_COMPLEX` and `NO_TRANSLATIONS` (nothing in the text relates to the policy). With several findings, the overall result is the worst one: `TRANSLATION_AMBIGUOUS`, `IMPOSSIBLE`, `INVALID`, `SATISFIABLE`, `VALID`.
 
-### 10.1 Create the policy
+**Two kinds of `SATISFIABLE`:**
+- **A fact is missing.** "I started riding again 3 days ago after being sick. Keep below 55% of FTP." Is the rider ill *now*? The text dates the illness before the restart but says nothing about today, so `isIllOrInjured` stays unknown. If they're well, the answer is right. If they're ill, it's wrong, because they should rest. The finding's `claimsTrueScenario` and `claimsFalseScenario` differ in exactly that variable, which is the question to ask.
+- **The answer is allowed but not required.** "8 days back. You can ride up to zone 2." The rule is a cap, zone ≤ 2, so zone 1 would satisfy it too. Zone 2 is permitted, not proven. That's fine: serve it.
+
+Only `INVALID` means "breaks a rule". A caps-style policy gives `VALID` only when the rules leave a single option, such as zone 1 in the zone 1 phase or rest when ill.
+
+### 10.1 Create the policy from your rules
 
 **Bedrock console → Automated Reasoning → Create policy.**
 
 | Field | Value |
 |---|---|
-| Name | `coach-return-to-training` |
+| Name | `coach-return-to-training-v2` |
 | Description | Intensity limits when returning after a break, illness or injury |
-| Ingest method | **Enter text** (paste the source content below) |
-| Describe the source content | (below) |
+| Ingest method | **Enter text** |
 | Tags | `project` = `cycling-coach` |
 
-**Source content.** Paste this. It's plain prose with numbered if-then rules, which extraction handles best. The phase lengths (one week of zone 1, two weeks of zone 2) are yours to change.
+**Source content.** Short semi-formal if-then rules extract far better than prose:
 
 ```text
-Return-to-training intensity policy for a cyclist.
+If ill or injured, then training_state=do_not_ride
+If (not (ill or injured)) and (athlete started riding again <= 1 week ago), then training_state=zone_1_phase
+If (not (ill or injured)) and (athlete started riding again > 1 week ago) and (athlete started riding again <= 3 weeks ago), then training_state=zone_2_phase
+If (not (ill or injured)) and (athlete started riding again > 3 weeks ago), then training_state=normal
+If (not (ill or injured)) and (athlete has not had a break), then training_state=normal
 
-Intensity zones use the Coggan power levels as a percentage of functional threshold power (FTP):
-zone 1 active recovery, below 55% of FTP; zone 2 endurance, 56 to 75%; zone 3 tempo, 76 to 90%;
-zone 4 threshold and sweet spot, 91 to 105%; zone 5 VO2 max, 106 to 120%; zone 6 anaerobic, 121 to 150%;
-zone 7 neuromuscular sprints, above 150%. A session may have steps in different zones. The zone of a
-session is the highest zone of any of its steps.
+Zone 1 (active recovery) is less than 55% of FTP
+Zone 2 (endurance) is between 56% and 75% of FTP
+The only other zones are 3, 4, 5, 6 and 7, which are all greater than 75% of FTP.
 
-An athlete is returning after a break if they have done little or no training for four weeks or more,
-or are starting to train from a very low level of fitness.
-
-An athlete is returning from illness or injury if they have been ill or injured and are now free of
-symptoms and starting to train again.
-
-A returning athlete is in exactly one return phase: the zone 1 phase, the zone 2 phase, or return complete.
-An athlete who is not returning after a break or from illness or injury is not in a return phase.
-
-A returning athlete starts in the zone 1 phase.
-The zone 1 phase ends, and the zone 2 phase begins, when the athlete has done at least one week of
-consistent zone 1 riding since returning, with no return of symptoms.
-The zone 2 phase ends, and the return is complete, when the athlete has done at least two weeks of
-consistent zone 2 riding after the zone 1 phase, with no return of symptoms.
-
-Rule 1: If the athlete is in the zone 1 phase, then the recommended session must not go above zone 1.
-Rule 2: If the athlete is in the zone 2 phase, then the recommended session must not go above zone 2.
-Rule 3: If the return is complete, or the athlete is not returning, these rules do not limit the
-recommended zone.
-Rule 4: If the athlete's symptoms have returned, then the recommendation must be rest, with no session.
-
-The recommended zone is a whole number from 1 to 7.
+If training_state=do_not_ride, then no activity should be suggested; the rider should be reminded to rest.
+If training_state=zone_1_phase, then no part of any activity should be greater than Zone 1
+If training_state=zone_2_phase, then no part of any activity should be greater than Zone 2.
+If training_state=normal, then activities may contain any zone 1 through 7.
 ```
 
-**Describe the source content:**
+**Describe the source content** (the console asks for the use case, the format and an example):
 
 ```text
-I'm building a cycling coach chatbot that recommends training sessions. This policy checks that its recommendations are safe for an athlete who is returning to training after a break, an illness or an injury. The document is a short policy in plain prose. It defines the intensity zones as percentages of FTP, says when an athlete counts as returning, describes the return phases (zone 1 phase, zone 2 phase, return complete) and what ends each one, and then gives numbered if-then rules that cap the intensity zone for each phase, with rest required if symptoms come back. Capture the athlete's return phase, whether their symptoms have returned, whether rest is recommended, and the highest zone in the recommended session. Ignore anything about nutrition, weight or equipment. Below is an example Q&A:
+I'm building a cycling coach chatbot that recommends training sessions. This policy checks that each recommendation is safe for the athlete's current training state, especially when they are ill, injured or returning to riding. The document is a short list of if-then rules written in a semi-formal style. The first rules set training_state (do_not_ride, zone_1_phase, zone_2_phase or normal) from whether the athlete is ill or injured and how long ago they started riding again. The next lines define the power zones as percentages of FTP. The last four rules limit the highest zone in any part of the recommended activity for each training state, or require rest. Capture whether the athlete is ill or injured, how long ago they started riding again (convert weeks to days), the training state, whether the answer recommends rest, and the highest zone in any part of the recommended activity. Ignore anything about nutrition, weight or equipment. Below is an example Q&A:
 
-- Question: I'm over my cold and this is my first ride back. What should I do?
-- Answer: Keep it to an easy zone 1 spin for 30 to 45 minutes, below 55% of your FTP.
+- Question: I'm over my cold and started riding again three days ago. Can I do some threshold intervals today?
+- Answer: Not yet. You're in the zone 1 phase, so keep the whole ride in zone 1, below 55% of FTP, for 30 to 45 minutes.
 ```
 
 **Create policy.** Extraction takes a few minutes.
 
-### 10.2 Review the definitions
+### 10.2 Review what extraction made, then simplify it
 
-Open the policy's **Definitions** page. You want something close to this. The names may differ, which doesn't matter as long as each concept appears once.
+Extraction gives you a **first draft, not a finished model**. With a first, prose version of these rules, it produced 9 variables and 21 rules, and 8 of its own 10 generated tests failed. Even from the semi-formal rules above it made 8 variables, including **four separate clocks** (days since riding again, since phase 1 completed, since zone 1 started, since zone 2 started) that no rule linked together. Look for:
 
-**Custom type** `ReturnPhase`: `ZONE1_PHASE`, `ZONE2_PHASE`, `RETURN_COMPLETE`, `NOT_RETURNING`. One value, because an athlete is in exactly one phase. Separate true/false flags would allow impossible combinations.
+- **Overlapping variables.** Unlinked clocks let two states be true at once, giving `IMPOSSIBLE`, or no state at all, giving `SATISFIABLE`. Keep **one** clock and express each phase as a range of it.
+- **Wrong numbers.** One extraction turned "four weeks" into "thirteen weeks" in a description. Read every description.
+- **Lists where you need numbers.** Zones extracted as a custom type (`zone_1` … `zone_7`) can't express "no higher than zone 2", or translate "up to zone 2" or "below 55% of FTP". Use an integer from 1 to 7.
+- **`_OTHER` values and bare assertions** such as `trainingState is not TrainingState_OTHER`. Remove them if every case is covered by a rule.
+- **One-way rules that should be two-way.** "If do_not_ride, then rest" says nothing about the other states, so an answer claiming "not rest" could never be `VALID`. The fix is `(= recommendsRest (= trainingState do_not_ride))`: rest exactly when the state is `do_not_ride`.
 
-| Variable | Type | Description should say |
+**The simplified definition** is in `bedrock/guardrails/ar-return-to-training.json`. It has 5 variables, 9 rules and one custom type:
+
+| Variable | Type | Key point in its description |
 |---|---|---|
-| `returnPhase` | ReturnPhase | The athlete's phase of returning to training after a break (four weeks or more of little or no training, or starting from very low fitness) or after illness or injury. `ZONE1_PHASE`: just returned, less than one week of consistent zone 1 riding, for example "first ride back", "just started again", "over my cold", "cleared by the physio". `ZONE2_PHASE`: has done at least a week of consistent zone 1 riding with no symptoms, but less than two weeks of zone 2 since then. `RETURN_COMPLETE`: has finished the zone 2 phase, or says they're back to normal training. `NOT_RETURNING`: training consistently, with no recent break, illness or injury. |
-| `symptomsReturned` | BOOL | True if the athlete says symptoms of their illness or injury have come back since returning, for example "my cough is back", "the knee is sore again". |
-| `recommendsRest` | BOOL | True if the answer recommends rest, a day off or no riding. |
-| `recommendedZone` | INT | The **highest** zone in the recommended session, 1 to 7. Map words and power to zones: recovery spin or "very easy" = 1; endurance, steady or "conversational" = 2; tempo = 3; sweet spot or threshold = 4; VO2 max = 5; anaerobic = 6; sprints = 7. If watts or % of FTP are given, use the ranges in the policy. |
-
-The rules should read like this in SMT-LIB:
+| `isIllOrInjured` | BOOL | Ill or injured **now**. False if they say they've recovered or are healthy. |
+| `daysSinceStartedRidingAgain` | INT | Weeks converted to days. A rider who isn't returning at all is 365, which lands in `normal` without needing another variable. |
+| `trainingState` | `TrainingState` | `do_not_ride`, `zone_1_phase`, `zone_2_phase` or `normal` |
+| `recommendsRest` | BOOL | True if the answer says to rest or not ride |
+| `highestZoneInActivity` | INT | 1 to 7, with words and % of FTP mapped to zones ("below 55% of FTP" = 1, "up to zone 2" = 2, "any zone" = 7) |
 
 ```
-(=> (= returnPhase ZONE1_PHASE) (<= recommendedZone 1))
-(=> (= returnPhase ZONE2_PHASE) (<= recommendedZone 2))
-(=> symptomsReturned recommendsRest)
-(and (>= recommendedZone 1) (<= recommendedZone 7))
+(=> isIllOrInjured (= trainingState do_not_ride))
+(=> (and (not isIllOrInjured) (<= daysSinceStartedRidingAgain 7)) (= trainingState zone_1_phase))
+(=> (and (not isIllOrInjured) (> daysSinceStartedRidingAgain 7) (<= daysSinceStartedRidingAgain 21)) (= trainingState zone_2_phase))
+(=> (and (not isIllOrInjured) (> daysSinceStartedRidingAgain 21)) (= trainingState normal))
+(= recommendsRest (= trainingState do_not_ride))
+(=> (= trainingState zone_1_phase) (<= highestZoneInActivity 1))
+(=> (= trainingState zone_2_phase) (<= highestZoneInActivity 2))
+(and (>= highestZoneInActivity 1) (<= highestZoneInActivity 7))
+(>= daysSinceStartedRidingAgain 0)
 ```
 
-**Check:**
-- **Descriptions:** edit each variable to the depth of the table above. Descriptions are the single biggest factor in translation accuracy. Extraction usually writes short ones.
-- **Duplicates of the phase:** extraction may also create true/false variables such as `isReturningAfterBreak` or `isZone1PhaseComplete`. They describe the same thing as `returnPhase`, so delete them and keep their wording in the `returnPhase` description. Overlapping variables cause `TRANSLATION_AMBIGUOUS`.
-- **Unused variables:** delete them. The console marks them with a warning.
-- **Rule 3:** it says what *isn't* limited, so extraction may produce no rule from it. That's fine, because no rule already means no limit. Delete it if it becomes an odd assertion.
-- **Bare assertions:** the range rule is the only one that should not be an if-then. A bare `(= returnPhase ZONE1_PHASE)` would make every athlete permanently in the zone 1 phase, and other inputs would come back `IMPOSSIBLE`.
-- **Source Document tab (fidelity report):** every statement in your text should ground at least one rule or variable. The zone table may ground none. That's fine, because it's there to help translation.
+**Replace the draft with it.** The update changes the draft but **not** what the console shows or what the tests run against: both use the latest **build**. So start an `IMPORT_POLICY` build afterwards. A policy keeps at most two builds, so delete an old one first if you have two.
 
-### 10.3 Generate scenarios (are the rules right?)
+```bash
+P=arn:aws:bedrock:us-east-1:<account-id>:automated-reasoning-policy/<policy-id>
+DEF=bedrock/guardrails/ar-return-to-training.json
 
-**View tests → Generate.** Each scenario is a set of values that your rules allow. Thumbs up if it could really happen. Thumbs down, with a sentence explaining why not, if it shouldn't. Then **Apply annotations** to let the console propose rule changes. Look for:
-- **Should be possible:** `returnPhase = ZONE1_PHASE, recommendedZone = 1`. Thumbs up.
-- **Should not be possible:** `returnPhase = ZONE2_PHASE, recommendedZone = 3` or higher. Thumbs down: "the zone 2 phase is limited to zone 2".
-- **Should not be possible:** `symptomsReturned = true, recommendsRest = false`. Thumbs down: "if symptoms return, the athlete must rest".
-- **Fine:** `returnPhase = RETURN_COMPLETE, recommendedZone = 5`. The return is over, so thumbs up.
+# Free a build slot if two builds already exist
+aws bedrock list-automated-reasoning-policy-build-workflows --region us-east-1 --policy-arn $P \
+  --query 'automatedReasoningPolicyBuildWorkflowSummaries[].[buildWorkflowId,buildWorkflowType,status,updatedAt]' --output text
+aws bedrock delete-automated-reasoning-policy-build-workflow --region us-east-1 --policy-arn $P \
+  --build-workflow-id <oldest-id> --last-updated-at <its-updatedAt>
 
-### 10.4 QnA tests (is the translation right?)
+# Replace the draft, then build it
+aws bedrock update-automated-reasoning-policy --region us-east-1 --policy-arn $P --policy-definition file://$DEF
+aws bedrock start-automated-reasoning-policy-build-workflow --region us-east-1 --policy-arn $P \
+  --build-workflow-type IMPORT_POLICY --source-content "$(jq -c '{policyDefinition: .}' $DEF)"
+```
+
+When the build shows `COMPLETED`, reload the console. The quality report (`get-automated-reasoning-policy-build-workflow-result-assets --asset-type QUALITY_REPORT`) should list no unused variables and no conflicting rules.
+
+### 10.3 Tests
 
 **View tests → Add**, one per row. Leave the confidence threshold at its default.
 
-| # | Input (question) | Output (answer) | Expected |
+| # | Question | Answer | Expected |
 |---|---|---|---|
-| 1 | I've had three months off the bike. What should I ride this week? | Keep every ride very easy, in zone 1 below 55% of FTP, for 30 to 45 minutes. | Valid |
-| 2 | I've had three months off the bike. What should I ride this week? | Start with 3 × 10 minutes at threshold to rebuild your fitness quickly. | Invalid |
-| 3 | I'm over my cold and have had no symptoms for three days. Can I ride? | Yes, an easy zone 1 spin of 30 minutes is fine. | Valid |
-| 4 | I'm back after flu and I've done a week of easy zone 1 rides with no symptoms. What's next? | You can now add steady zone 2 endurance rides of up to 90 minutes. | Valid |
-| 5 | I'm back after flu and I've done a week of easy zone 1 rides with no symptoms. What's next? | Add two sweet spot sessions this week. | Invalid |
-| 6 | The physio has cleared my knee. It's my first ride back. What should I do? | Ride 60 minutes in zone 2. | Invalid |
-| 7 | I'm getting back into riding after being ill. Is zone 2 OK? | Yes, zone 2 is fine. | Satisfiable |
-| 8 | I'm training consistently and feel great. What should I do today? | 5 × 4 minutes at VO2 max with 4 minutes of recovery. | Satisfiable |
-| 9 | How many grams of carbohydrate should I eat per hour on a long ride? | Aim for 60 to 90 g per hour. | No translations |
-| 10 | After my illness I did a week of zone 1, then two weeks of zone 2, all with no symptoms. What now? | You can return to normal training, including 4 × 8 minutes at VO2 max. | Satisfiable |
-| 11 | I'm in my second week back after flu, but my cough has come back. Can I ride in zone 2 today? | Yes, a steady zone 2 ride is fine. | Invalid |
-| 12 | I'm in my second week back after flu, but my cough has come back. Can I ride in zone 2 today? | Take today off and rest until the cough has gone. | Valid |
+| 1 | I'm currently injured with a knee problem. Should I go out for a ride today? | No, you should rest and not ride until you've recovered. | Valid |
+| 2 | I'm recovering from an injury. Can I do a ride with most of it in zone 1 but a few minutes in zone 2? | No, you're injured so you should rest completely and not ride at all. | Valid |
+| 3 | I have a bad cold. Can I do an easy zone 1 recovery ride? | Yes, as long as you keep it very easy in zone 1. | Invalid |
+| 4 | I'm fully recovered from being sick. I started riding again 3 days ago. What's the maximum power I should ride at? | Keep your power below 55% of FTP. | Valid |
+| 5 | I'm not injured and I started riding again 4 days ago. Can I do some intervals at 80% of FTP? | No, you should keep your entire ride in zone 1, below 55% of FTP. | Valid |
+| 6 | I recovered from the flu and started riding again 5 days ago. Can I do a ride with some time in zone 3? | No, you're still in the zone 1 phase. Keep your entire ride below 55% of FTP. | Valid |
+| 7 | I started riding again 8 days ago and completed phase 1 yesterday. What zones can I ride in today? | You can ride up to zone 2, between 56% and 75% of FTP. | Satisfiable |
+| 8 | I'm not ill or injured, and I started riding again 10 days ago after a break. What zones can I train in? | You can train up to zone 2, which is between 56% and 75% of FTP. | Satisfiable |
+| 9 | I'm healthy and started riding again 12 days ago. My zone 1 phase started 9 days ago and my zone 2 phase started 3 days ago. What's my training state? | You're in normal training state and can do any zones 1 through 7. | Invalid |
 
-**What the tricky ones teach:**
-- **7, `SATISFIABLE`:** the answer is right in the zone 2 phase and wrong in the zone 1 phase. The question doesn't say which. The finding's `claimsTrueScenario` and `claimsFalseScenario` show exactly the missing fact, which is what the coach should ask about.
-- **6:** "first ride back" must translate to `returnPhase = ZONE1_PHASE`. If it comes back `SATISFIABLE`, improve the `returnPhase` description, not the rule.
-- **8 and 10:** `SATISFIABLE` isn't "wrong". No rule caps a complete return or an athlete who isn't returning, so zone 5 is allowed but not *proven*. Only `INVALID` means "breaks a rule".
-- **11 and 12:** Rule 4 overrides the phase. Both answers are in the zone 2 phase, but the returned cough makes anything other than rest invalid.
-- **9:** off-topic text gives `NO_TRANSLATIONS`. Automated Reasoning doesn't detect off-topic content; topics and relevance do.
+**Validate all tests.** All nine should pass. For a failure, read the finding's **translation first**: which premises and claims came out, and with what confidence? Fix descriptions before rules. To read results through the API:
 
-**Validate all tests.** For each failure, open the finding and look at the **translation first**: which premises and claims came out, and with what confidence? Fix descriptions, re-run, and repeat. Change a rule only when the translation is right and the result is still wrong.
+```bash
+B=<latest buildWorkflowId>
+aws bedrock list-automated-reasoning-policy-test-results --region us-east-1 --policy-arn $P --build-workflow-id $B \
+  --query 'testResults[].[testCase.testCaseId,testCase.expectedAggregatedFindingsResult,aggregatedTestFindingsResult,testRunResult]' --output text
+aws bedrock get-automated-reasoning-policy-test-result --region us-east-1 --policy-arn $P --build-workflow-id $B \
+  --test-case-id <id> --query 'testResult.testFindings'
+```
 
-### 10.5 Version it and attach it to the guardrail
+**What these tests taught:**
+- **Test 4 started as "…3 days ago after being sick"** and came back `SATISFIABLE`. "After being sick" dates the illness before the restart, not today, and the translating models won't turn a likely inference into a premise, because a wrong premise would make a `VALID` proof wrong. Even "recovered from the flu" (test 6) was dropped by one of three models (confidence 0.67). The real fix is in the app: give the check explicit facts ("Currently ill or injured: no. Started riding again: 3 days ago.") from the daily log.
+- **Tests 5 and 6 were `SATISFIABLE`** until the rest rule became two-way. Their answers claim "not rest", which the one-way rule never forced.
+- **Tests 7 and 8 are `SATISFIABLE` by design.** Zone 2 is allowed under the cap, not required.
+- **Generated tests need checking too.** Extraction's own tests included an impossible timeline (zone 2 starting before zone 1) and expected `VALID` for answers that were only allowed.
+
+### 10.4 Version it and attach it to the guardrail
 
 1. In the policy, choose **Save as new version**. That makes version 1, which is immutable, like a guardrail version.
-2. **Guardrails → `coach-guardrail` → Edit**. On the **Add Automated Reasoning checks** step, choose **Enable Automated Reasoning policy**, pick `coach-return-to-training` version 1, then finish the edit. You're changing the guardrail **draft**.
+2. **Guardrails → `coach-guardrail` → Edit**. On the **Add Automated Reasoning checks** step, choose **Enable Automated Reasoning policy**, pick `coach-return-to-training-v2` version 1, then finish the edit. You're changing the guardrail **draft**.
 3. **The cross-region profile is required.** A guardrail with an Automated Reasoning policy must use a cross-region guardrail profile. `coach-guardrail` already uses `us.guardrail.v1:0` (Standard tier), so there's nothing to change. A Classic-tier guardrail would be rejected.
 
 The checker script ignores Automated Reasoning findings, so your 30 cases should give the same results as before.
 
-### 10.6 Call it from the CLI
+### 10.5 Call it from the CLI
 
 Mark the question as `query` (user side) and the answer as `guard_content` (the claim to check):
 
@@ -408,7 +413,7 @@ Mark the question as `query` (user side) and the answer as `guard_content` (the 
 aws bedrock-runtime apply-guardrail --region us-east-1 \
   --guardrail-identifier <guardrail-id> --guardrail-version DRAFT --source OUTPUT \
   --content '[
-    {"text": {"text": "I am back after flu. It is my first ride.", "qualifiers": ["query"]}},
+    {"text": {"text": "Currently ill or injured: no. Started riding again: 2 days ago. Can I do intervals today?", "qualifiers": ["query"]}},
     {"text": {"text": "Do 4 x 8 minutes at threshold.", "qualifiers": ["guard_content"]}}
   ]' \
   --query '{action: action, units: usage.automatedReasoningPolicyUnits, findings: assessments[].automatedReasoningPolicy.findings}'
@@ -419,34 +424,34 @@ aws bedrock-runtime apply-guardrail --region us-east-1 \
 - **Each finding has one key** (`valid`, `invalid`, `satisfiable` and so on), and `invalid` lists `contradictingRules`.
 - **`automatedReasoningPolicyUnits` must be greater than 0.** With `Converse`, plain text blocks are **not** checked: you must wrap the question in a `guardContent` block, or the check is silently skipped, with `units: 0` and no error. This is a classic integration trap.
 
-### 10.7 How the coach would use it (later, not built yet)
+### 10.6 How the coach would use it (later, not built yet)
 
 ```
 advice Lambda / chat Lambda
-  ├─ build the prompt with the facts as text ("returning from illness: yes, phase: zone 1, days so far: 6")
+  ├─ build the prompt with the facts as text ("Currently ill or injured: no. Started riding again: 6 days ago.")
   ├─ call the model
   ├─ ApplyGuardrail(query = facts + question, guard_content = answer)
   ├─ valid / no translations ──► serve
   ├─ invalid ──► one rewrite with the contradicting rules in the prompt, check again, else a safe fallback
-  └─ satisfiable ──► ask the missing question ("how long have you been riding easily since you came back?")
+  └─ satisfiable ──► ask the missing question ("Are you fully over it?" or "When did you start riding again?")
 ```
 
 **Bedrock Agents:** the docs list `Converse`, `InvokeModel` and `ApplyGuardrail` as the ways to run Automated Reasoning checks. For the Module C chat, run `ApplyGuardrail` on the agent's final answer in the chat Lambda, rather than relying on the guardrail attached to the agent.
 
-**Cost:** each check is billed by the text processed, at a higher rate than the other policies, and on every call, whatever the result. Check the Bedrock pricing page. Twelve console tests and a few CLI calls cost cents. With no calls, the cost is $0.
+**Cost:** each check is billed by the text processed, at a higher rate than the other policies, and on every call, whatever the result. Check the Bedrock pricing page. Nine console tests and a few CLI calls cost cents. With no calls, the cost is $0.
 
-### 10.8 Self-check
+### 10.7 Self-check
 
-1. Test 7 returns `SATISFIABLE`. Is the coach's answer wrong? What should the app do?
-2. Test 6 returns `SATISFIABLE` instead of `INVALID`. Do you change the rule or the variable description? Why?
+1. Test 8 returns `SATISFIABLE`. Is the coach's answer wrong? What should the app do?
+2. "I started riding again 3 days ago after being sick" returns `SATISFIABLE` for a zone 1 answer. Do you change the rule or the variable description, or something else? Why?
 3. Your `Converse` call with a guardrail shows `automatedReasoningPolicyUnits: 0`. What's missing?
 4. An answer is `INVALID`, but `action` is `NONE`. Why wasn't it blocked?
 
 <details>
 <summary>Answers</summary>
 
-1. Not necessarily. It's right in the zone 2 phase, and wrong in the zone 1 phase. Compare `claimsTrueScenario` with `claimsFalseScenario` to find the missing fact, then ask the athlete, or rewrite the answer to state the condition.
-2. The variable description. Validation is mathematically sound, so if the rule is right, the translation is what failed: "first ride back" wasn't mapped to `returnPhase = ZONE1_PHASE`. Say so in that variable's description.
+1. No. Zone 2 is allowed in the zone 2 phase but not required, because zone 1 also satisfies the cap. Serve it. Only `INVALID` means a rule is broken.
+2. Neither, mainly. The rules are right; the translation left `isIllOrInjured` unknown, because the text dates the illness before the restart and says nothing about today. A sharper description can help sometimes, but the reliable fix is for the app to state the fact ("Currently ill or injured: no"), or to ask the athlete.
 3. A `guardContent` block. On `Converse`, plain text isn't checked by Automated Reasoning. Wrap the question in `guardContent` with the `query` qualifier, and the model's answer is added as the claim.
 4. Automated Reasoning checks only detect. They return findings, and the application decides whether to serve, rewrite or block.
 
